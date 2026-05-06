@@ -75,7 +75,7 @@ export function render(layoutResult: LayoutResult, options: RenderOptions = {}):
       );
     } else {
       parts.push(
-        `<rect x="${round(rail.x)}" y="${round(rail.y)}" width="${round(rail.width)}" height="${round(rail.height)}" rx="${round(rail.height / 2)}" fill="${escapeXml(rail.color ?? theme.colors.railFill)}" stroke="${escapeXml(theme.colors.railStroke)}" stroke-width="${theme.strokes.railWidth}"/>`
+        `<rect x="${round(rail.x)}" y="${round(rail.y)}" width="${round(rail.width)}" height="${round(rail.height)}" fill="${escapeXml(rail.color ?? theme.colors.railFill)}" stroke="${escapeXml(theme.colors.railStroke)}" stroke-width="${theme.strokes.railWidth}"/>`
       );
     }
   }
