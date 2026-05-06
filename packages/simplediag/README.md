@@ -19,4 +19,11 @@ if (result.svg) {
 }
 ```
 
-V0.1 implements an nwdiag-compatible core subset. It is not a PlantUML port.
+It targets the common-case nwdiag input — multiple networks, multi-homed
+nodes, groups, peer links, addresses, shapes, defaults. It is not a PlantUML
+port; the rendering is reimplemented in TypeScript under MIT.
+
+For features that go beyond standard nwdiag (programmatic API, structured
+diagnostics, additional shapes, peer-link attributes, Manhattan routing, the
+networking shape pack), see [SUPERSET.md](./SUPERSET.md). That document also
+holds the placeholder list of planned superset additions.
