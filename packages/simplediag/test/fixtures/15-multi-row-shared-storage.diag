@@ -1,0 +1,62 @@
+nwdiag {
+  default_connection_style = dashed;
+  span_height = 130;
+  span_width = 30;
+
+  network o_and_m_1 {
+    row = "O&M";
+    s1a [shape = rect, placement = top];
+    s2a [shape = rect, placement = top];
+    insv1 [shape = rect, placement = bottom];
+    sw1 [shape = switch];
+  }
+  network o_and_m_2 {
+    row = "O&M";
+    s1b [shape = rect, placement = top];
+    s2b [shape = rect, placement = top];
+    sw1;
+    insv2 [shape = rect, placement = bottom];
+    sw2 [shape = switch];
+  }
+  network o_and_m_3 {
+    row = "O&M";
+    s1c [shape = rect, placement = top];
+    s2c [shape = rect, placement = top];
+    sw2;
+    insv3 [shape = rect, placement = bottom];
+  }
+  network internal_1 {
+    row = "Internal";
+    s1a; s2a;
+    isw1 [shape = switch];
+    insv1 [shape = rect, placement = bottom];
+  }
+  network internal_2 {
+    row = "Internal";
+    s1b; s2b;
+    isw1;
+    isw2 [shape = switch];
+    insv2 [shape = rect, placement = bottom];
+  }
+  network internal_3 {
+    row = "Internal";
+    s1c; s2c;
+    isw2;
+    insv3 [shape = rect, placement = bottom];
+  }
+  network others {
+    row = "Others";
+    style = dashed;
+    width = full;
+    s1a; s2a; s1b; s2b; s1c; s2c;
+  }
+  network storage {
+    row = "Storage";
+    width = full;
+    insv1 [shape = rect, placement = bottom];
+    insv2 [shape = rect, placement = bottom];
+    insv3 [shape = rect, placement = bottom];
+  }
+  group cap_app { description = "App Servers"; style = label-only; s1a; s2a; }
+  group cap_db { description = "DB Servers"; style = label-only; insv1; insv2; insv3; }
+}
