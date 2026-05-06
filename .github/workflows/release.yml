@@ -41,7 +41,5 @@ jobs:
             exit 1
           fi
 
-      - name: Publish to npm with provenance
+      - name: Publish to npm via Trusted Publishers (OIDC)
         run: pnpm --filter simplediag publish --no-git-checks --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
