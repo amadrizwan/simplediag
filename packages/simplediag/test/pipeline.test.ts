@@ -34,7 +34,7 @@ describe("pipeline", () => {
     expect(placed.rails[0]).toMatchObject({ label: "dmz", fullWidth: true });
     expect(placed.nodes.find((node) => node.nodeId === "db01")).toMatchObject({ span: 2, shape: "database" });
     expect(placed.groups[0]).toMatchObject({ label: "Application" });
-    expect(placed.peerLinks[0]?.points).toHaveLength(2);
+    expect(placed.peerLinks[0]?.points).toHaveLength(4);
   });
 
   it("renders escaped SVG with optional id", () => {

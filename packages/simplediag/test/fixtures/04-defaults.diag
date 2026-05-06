@@ -1,0 +1,15 @@
+nwdiag {
+  default_node_color = "#fff7e6";
+  default_group_color = "#e0f2fe";
+  span_height = 140;
+
+  network dmz {
+    web01;
+    web02;
+  }
+  network internal {
+    web01;
+    web02;
+    db01 [shape = database];
+  }
+}

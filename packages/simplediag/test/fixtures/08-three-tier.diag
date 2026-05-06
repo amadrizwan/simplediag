@@ -1,0 +1,35 @@
+nwdiag {
+  default_fontsize = 13;
+  span_height = 130;
+
+  network public {
+    address = "203.0.113.0/24";
+    lb [address = ".10", description = "Load balancer", shape = roundedbox];
+  }
+  network app {
+    address = "10.20.0.0/24";
+    lb [address = ".10"];
+    web01 [address = ".11", stacked = true];
+    web02 [address = ".12", stacked = true];
+    group webs {
+      description = "Web tier";
+      web01;
+      web02;
+    }
+  }
+  network data {
+    address = "10.30.0.0/24";
+    web01 [address = ".11"];
+    web02 [address = ".12"];
+    db01 [address = ".20", shape = database];
+    db02 [address = ".21", shape = database];
+    cache [address = ".30", shape = queue];
+    group dbs {
+      description = "Data tier";
+      db01;
+      db02;
+    }
+    web01 -- cache [label = "redis", style = dashed];
+    web01 -- db01 [label = "sql"];
+  }
+}

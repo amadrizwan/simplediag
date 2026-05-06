@@ -1,0 +1,11 @@
+# Top-level comment
+nwdiag
+{
+  // multi-line opening braces are accepted
+  network demo
+  {
+    address = "10.0.0.0/24"; # CIDR comment
+    web01 [address = ".1"]; // first node
+    web02; // bare node
+  }
+}

@@ -21,8 +21,20 @@ import type {
 } from "./types";
 import { diagnostic, uniqueId } from "./utils";
 
-const knownProperties = new Set(["address", "color", "width", "description", "shape"]);
-const knownShapes = new Set<NodeShape>(["rectangle", "database", "cloud", "actor", "component", "queue"]);
+const knownProperties = new Set(["address", "color", "width", "description", "shape", "stacked"]);
+const knownShapes = new Set<NodeShape>([
+  "rectangle",
+  "database",
+  "cloud",
+  "actor",
+  "component",
+  "queue",
+  "note",
+  "roundedbox",
+  "circle",
+  "ellipse",
+  "diamond"
+]);
 const defaultDirectives = new Set([
   "default_node_color",
   "default_group_color",
@@ -134,14 +146,17 @@ function visit(statement: AstStatement, state: State, context: Context): void {
     case "Property":
       applyProperty(statement.name, statement.value, statement.loc, state, context);
       break;
-    case "PeerLink":
-      state.peerLinks.push({
+    case "PeerLink": {
+      const link: ResolvedPeerLink = {
         id: `peer-${state.peerLinks.length + 1}`,
         from: statement.from,
         to: statement.to,
         loc: statement.loc
-      });
+      };
+      applyPeerLinkAttributes(link, statement.attributes, state, statement.loc);
+      state.peerLinks.push(link);
       break;
+    }
   }
 }
 
@@ -230,6 +245,7 @@ function ensureNode(id: string, state: State, loc?: SourceRange): ResolvedNode {
     order: state.nodes.size,
     shape: "rectangle",
     width: 1,
+    stacked: false,
     attachments: [],
     loc
   };
@@ -334,6 +350,39 @@ function applyGroupProperty(group: ResolvedGroup, key: string, value: AttributeV
   if (key === "description") group.description = text;
 }
 
+const knownLinkAttrs = new Set(["label", "color", "style"]);
+const linkStyles = new Set<"solid" | "dashed" | "dotted">(["solid", "dashed", "dotted"]);
+
+function applyPeerLinkAttributes(
+  link: ResolvedPeerLink,
+  attributes: AttributeMap,
+  state: State,
+  loc: SourceRange
+): void {
+  for (const [name, value] of Object.entries(attributes)) {
+    const key = name.toLowerCase();
+    if (!knownLinkAttrs.has(key)) {
+      state.diagnostics.push(
+        diagnostic("warning", "resolve.unknownAttribute", `Unknown peer link attribute "${name}".`, loc)
+      );
+      continue;
+    }
+    const text = stringify(value);
+    if (key === "label") link.label = text;
+    if (key === "color") link.color = text;
+    if (key === "style") {
+      const style = text.toLowerCase();
+      if (linkStyles.has(style as "solid" | "dashed" | "dotted")) {
+        link.style = style as "solid" | "dashed" | "dotted";
+      } else {
+        state.diagnostics.push(
+          diagnostic("warning", "resolve.unknownLinkStyle", `Unknown link style "${text}", using dashed.`, loc)
+        );
+      }
+    }
+  }
+}
+
 function applyNodeAttributes(
   node: ResolvedNode,
   attributes: AttributeMap,
@@ -355,6 +404,9 @@ function applyNodeAttributes(
       const width = typeof value === "number" ? value : Number(text);
       if (Number.isFinite(width) && width > 0) node.width = Math.max(1, Math.floor(width));
     }
+    if (key === "stacked") {
+      node.stacked = typeof value === "boolean" ? value : text.toLowerCase() !== "false";
+    }
   }
 }
 
@@ -366,7 +418,11 @@ function normalizeShape(value: string, state: State, loc: SourceRange): NodeShap
     rect: "rectangle",
     db: "database",
     storage: "database",
-    person: "actor"
+    person: "actor",
+    rounded: "roundedbox",
+    rhombus: "diamond",
+    oval: "ellipse",
+    sticky: "note"
   };
   const shape = aliases[normalized] ?? normalized;
   if (knownShapes.has(shape as NodeShape)) return shape as NodeShape;

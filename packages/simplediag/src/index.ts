@@ -10,6 +10,7 @@ export type {
   DiagramType,
   ErrorMode,
   GroupAst,
+  LinkStyle,
   LayoutOptions,
   LayoutResult,
   NetworkAst,

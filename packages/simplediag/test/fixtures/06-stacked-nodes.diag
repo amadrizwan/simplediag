@@ -1,0 +1,7 @@
+nwdiag {
+  network app {
+    web [stacked = true];
+    api [stacked = true, shape = component];
+    db [shape = database];
+  }
+}

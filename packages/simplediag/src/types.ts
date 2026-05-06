@@ -72,8 +72,11 @@ export interface PeerLinkAst {
   kind: "PeerLink";
   from: string;
   to: string;
+  attributes: AttributeMap;
   loc: SourceRange;
 }
+
+export type LinkStyle = "solid" | "dashed" | "dotted";
 
 export interface ParseOptions {
   diagramType?: DiagramType;
@@ -127,6 +130,7 @@ export interface ResolvedNode {
   color?: string;
   shape: NodeShape;
   width: number;
+  stacked: boolean;
   attachments: ResolvedAttachment[];
   loc?: SourceRange;
 }
@@ -137,7 +141,12 @@ export type NodeShape =
   | "cloud"
   | "actor"
   | "component"
-  | "queue";
+  | "queue"
+  | "note"
+  | "roundedbox"
+  | "circle"
+  | "ellipse"
+  | "diamond";
 
 export interface ResolvedAttachment {
   id: string;
@@ -161,6 +170,9 @@ export interface ResolvedPeerLink {
   id: string;
   from: string;
   to: string;
+  label?: string;
+  color?: string;
+  style?: LinkStyle;
   loc?: SourceRange;
 }
 
@@ -211,6 +223,7 @@ export interface PlacedNode {
   span: number;
   shape: NodeShape;
   color?: string;
+  stacked: boolean;
 }
 
 export interface PlacedGroup {
@@ -239,6 +252,9 @@ export interface PlacedPeerLink {
   fromNodeId: string;
   toNodeId: string;
   points: Point[];
+  label?: string;
+  color?: string;
+  style?: LinkStyle;
 }
 
 export interface PlacedLabel {

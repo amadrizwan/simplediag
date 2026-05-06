@@ -71,9 +71,18 @@ export function render(layoutResult: LayoutResult, options: RenderOptions = {}):
 
   for (const link of layoutResult.peerLinks) {
     const points = link.points.map((point) => `${round(point.x)},${round(point.y)}`).join(" ");
+    const color = link.color ?? theme.colors.linkStroke;
+    const style = link.style ?? "dashed";
+    const dash = style === "solid" ? "" : style === "dotted" ? ' stroke-dasharray="1 4"' : ' stroke-dasharray="4 4"';
     parts.push(
-      `<polyline points="${points}" fill="none" stroke="${escapeXml(theme.colors.linkStroke)}" stroke-width="${theme.strokes.linkWidth}" stroke-dasharray="4 4"/>`
+      `<polyline points="${points}" fill="none" stroke="${escapeXml(color)}" stroke-width="${theme.strokes.linkWidth}"${dash}/>`
     );
+    if (link.label && link.points.length >= 2) {
+      const mid = midpoint(link.points);
+      parts.push(
+        `<text x="${round(mid.x)}" y="${round(mid.y - 4)}" text-anchor="middle" font-size="${theme.typography.labelFontSize}" fill="${escapeXml(theme.colors.mutedText)}">${escapeXml(link.label)}</text>`
+      );
+    }
   }
 
   for (const line of layoutResult.dropLines) {
@@ -112,7 +121,17 @@ function renderNode(node: PlacedNode, theme: SimplediagTheme): string {
   const stroke = escapeXml(theme.colors.nodeStroke);
   const labelX = round(node.x + node.width / 2);
   const labelY = round(node.y + node.height / 2 + theme.typography.fontSize / 3);
+  const stackParts: string[] = [];
+  if (node.stacked) {
+    const offset = 6;
+    for (let i = 2; i >= 1; i -= 1) {
+      stackParts.push(
+        renderShape(node.shape, node.x + offset * i, node.y - offset * i, node.width, node.height, fill, stroke, theme)
+      );
+    }
+  }
   return [
+    ...stackParts,
     renderShape(node.shape, node.x, node.y, node.width, node.height, fill, stroke, theme),
     `<text x="${labelX}" y="${labelY}" text-anchor="middle" font-size="${theme.typography.fontSize}" fill="${escapeXml(theme.colors.text)}">${escapeXml(node.label)}</text>`
   ].join("");
@@ -160,6 +179,36 @@ function renderShape(
       `<line x1="${round(cx)}" y1="${round(torsoY2)}" x2="${round(cx + legSpread)}" y2="${round(y + height)}" stroke="${stroke}" stroke-width="${sw}"/>`
     ].join("");
   }
+  if (shape === "note") {
+    const fold = Math.min(width * 0.18, height * 0.42);
+    const path = [
+      `M ${round(x)} ${round(y)}`,
+      `L ${round(x + width - fold)} ${round(y)}`,
+      `L ${round(x + width)} ${round(y + fold)}`,
+      `L ${round(x + width)} ${round(y + height)}`,
+      `L ${round(x)} ${round(y + height)}`,
+      `Z`
+    ].join(" ");
+    const foldLine = `M ${round(x + width - fold)} ${round(y)} L ${round(x + width - fold)} ${round(y + fold)} L ${round(x + width)} ${round(y + fold)}`;
+    return `<path d="${path}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/><path d="${foldLine}" fill="none" stroke="${stroke}" stroke-width="${sw}"/>`;
+  }
+  if (shape === "roundedbox") {
+    const r = Math.min(width, height) * 0.25;
+    return `<rect x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(height)}" rx="${round(r)}" ry="${round(r)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  }
+  if (shape === "circle") {
+    const r = Math.min(width, height) / 2;
+    return `<circle cx="${round(x + width / 2)}" cy="${round(y + height / 2)}" r="${round(r)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  }
+  if (shape === "ellipse") {
+    return `<ellipse cx="${round(x + width / 2)}" cy="${round(y + height / 2)}" rx="${round(width / 2)}" ry="${round(height / 2)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  }
+  if (shape === "diamond") {
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    const points = `${round(cx)},${round(y)} ${round(x + width)},${round(cy)} ${round(cx)},${round(y + height)} ${round(x)},${round(cy)}`;
+    return `<polygon points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  }
   const tab =
     shape === "component"
       ? `<rect x="${round(x + 0.071 * width)}" y="${round(y + 0.208 * height)}" width="${round(0.107 * width)}" height="${round(0.167 * height)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/><rect x="${round(x + 0.071 * width)}" y="${round(y + 0.583 * height)}" width="${round(0.107 * width)}" height="${round(0.167 * height)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`
@@ -189,4 +238,11 @@ function renderErrorSvg(diagnostics: Diagnostic[], options: RenderOptions): stri
 
 function round(value: number): string {
   return Number(value.toFixed(2)).toString();
+}
+
+function midpoint(points: readonly { x: number; y: number }[]): { x: number; y: number } {
+  if (points.length < 2) return points[0] ?? { x: 0, y: 0 };
+  const total = points.reduce((sum, p) => sum + p.x, 0);
+  const totalY = points.reduce((sum, p) => sum + p.y, 0);
+  return { x: total / points.length, y: totalY / points.length };
 }

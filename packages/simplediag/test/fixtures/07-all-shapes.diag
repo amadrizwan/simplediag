@@ -1,0 +1,15 @@
+nwdiag {
+  network shapes {
+    rect [shape = rectangle];
+    db [shape = database];
+    cl [shape = cloud];
+    person [shape = actor];
+    svc [shape = component];
+    q [shape = queue];
+    n [shape = note];
+    rb [shape = roundedbox];
+    c [shape = circle];
+    e [shape = ellipse];
+    d [shape = diamond];
+  }
+}

@@ -59,6 +59,7 @@ nwdiag {
             ],
           },
           {
+            "attributes": {},
             "from": "web01",
             "kind": "PeerLink",
             "to": "db01",

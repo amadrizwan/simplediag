@@ -1,0 +1,15 @@
+nwdiag {
+  span_height = 130;
+  network bus {
+    a;
+    b;
+    c;
+    d;
+    e;
+    f;
+    a -- d;
+    b -- e;
+    c -- f;
+    a -- f [style = dotted];
+  }
+}

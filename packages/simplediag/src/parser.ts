@@ -123,12 +123,13 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
       continue;
     }
 
-    const peerLink = /^([^\s\[\]{};=]+)\s*--\s*([^\s\[\]{};=]+)\s*;?$/.exec(stripped);
+    const peerLink = /^([^\s\[\]{};=]+)\s*--\s*([^\s\[\]{};=]+)(?:\s*\[(.*)\])?\s*;?$/.exec(stripped);
     if (peerLink) {
       addStatement(stack, {
         kind: "PeerLink",
         from: peerLink[1] ?? "",
         to: peerLink[2] ?? "",
+        attributes: parseAttributes(peerLink[3] ?? "", diagnostics, loc),
         loc
       });
       continue;

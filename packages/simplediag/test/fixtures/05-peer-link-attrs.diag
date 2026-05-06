@@ -1,0 +1,9 @@
+nwdiag {
+  network n {
+    web01;
+    db01 [shape = database];
+    cache [shape = queue];
+    web01 -- db01 [label = "TCP", style = dashed];
+    web01 -- cache [label = "redis", color = "#1f6feb", style = solid];
+  }
+}
