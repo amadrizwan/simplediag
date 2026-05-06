@@ -1,0 +1,12 @@
+node_modules/
+.pnpm-store/
+.pnpm-home/
+plantuml/
+
+dist/
+coverage/
+.turbo/
+.cache/
+
+*.log
+.DS_Store

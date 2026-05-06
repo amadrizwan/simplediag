@@ -1,0 +1,12 @@
+{
+  "name": "simplediag-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.3",
+  "scripts": {
+    "build": "pnpm --filter simplediag build",
+    "test": "pnpm --filter simplediag test",
+    "typecheck": "pnpm --filter simplediag typecheck",
+    "check:license": "pnpm --filter simplediag check:license"
+  }
+}
