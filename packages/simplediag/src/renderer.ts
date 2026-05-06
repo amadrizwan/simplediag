@@ -273,20 +273,48 @@ function renderShape(
     ].join("");
   }
   if (shape === "switch") {
-    const tabH = height * 0.18;
-    const arrowSize = tabH * 0.7;
-    const portCount = 4;
-    const arrows: string[] = [];
-    for (let i = 0; i < portCount; i += 1) {
-      const px = x + width * ((i + 0.5) / portCount);
-      arrows.push(
-        `<polygon points="${round(px - arrowSize / 2)},${round(y + tabH)} ${round(px + arrowSize / 2)},${round(y + tabH)} ${round(px)},${round(y + tabH + arrowSize)}" fill="${stroke}"/>`,
-        `<polygon points="${round(px - arrowSize / 2)},${round(y + height - tabH)} ${round(px + arrowSize / 2)},${round(y + height - tabH)} ${round(px)},${round(y + height - tabH - arrowSize)}" fill="${stroke}"/>`
-      );
+    const bodyH = height * 0.86;
+    const footY = y + bodyH;
+    const footH = height * 0.1;
+    const padX = width * 0.04;
+    const padY = bodyH * 0.18;
+    const portsRight = x + width * 0.66;
+    const portsLeft = x + padX;
+    const portsTop = y + padY;
+    const portsBottom = y + bodyH - padY;
+    const portCols = 5;
+    const portRows = 2;
+    const portW = (portsRight - portsLeft) / portCols * 0.78;
+    const portH = (portsBottom - portsTop) / portRows * 0.6;
+    const colGap = ((portsRight - portsLeft) - portW * portCols) / (portCols + 1);
+    const rowGap = ((portsBottom - portsTop) - portH * portRows) / (portRows + 1);
+    const portsSvg: string[] = [];
+    for (let r = 0; r < portRows; r += 1) {
+      for (let c = 0; c < portCols; c += 1) {
+        const px = portsLeft + colGap + c * (portW + colGap);
+        const py = portsTop + rowGap + r * (portH + rowGap);
+        portsSvg.push(
+          `<rect x="${round(px)}" y="${round(py)}" width="${round(portW)}" height="${round(portH)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw * 0.55}"/>`,
+          `<line x1="${round(px + portW * 0.18)}" y1="${round(py + portH * 0.55)}" x2="${round(px + portW * 0.82)}" y2="${round(py + portH * 0.55)}" stroke="${stroke}" stroke-width="${sw * 0.45}"/>`
+        );
+      }
     }
+    const csSize = Math.min(width * 0.26, bodyH * 0.7);
+    const csX = x + width - padX - csSize;
+    const csY = y + (bodyH - csSize) / 2;
+    const csInset = csSize * 0.18;
+    const arrowEnd = csSize * 0.14;
     return [
-      `<rect x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(height)}" rx="${theme.shapes.cornerRadius}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
-      ...arrows
+      `<rect x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(bodyH)}" rx="${theme.shapes.cornerRadius}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
+      `<rect x="${round(x - width * 0.015)}" y="${round(footY)}" width="${round(width * 1.03)}" height="${round(footH)}" rx="${round(footH * 0.4)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
+      ...portsSvg,
+      `<rect x="${round(csX)}" y="${round(csY)}" width="${round(csSize)}" height="${round(csSize)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw * 0.7}"/>`,
+      `<line x1="${round(csX + csInset)}" y1="${round(csY + csInset)}" x2="${round(csX + csSize - csInset)}" y2="${round(csY + csSize - csInset)}" stroke="${stroke}" stroke-width="${sw * 0.7}"/>`,
+      `<line x1="${round(csX + csSize - csInset)}" y1="${round(csY + csInset)}" x2="${round(csX + csInset)}" y2="${round(csY + csSize - csInset)}" stroke="${stroke}" stroke-width="${sw * 0.7}"/>`,
+      `<polygon points="${round(csX + csInset)},${round(csY + csInset)} ${round(csX + csInset + arrowEnd)},${round(csY + csInset)} ${round(csX + csInset)},${round(csY + csInset + arrowEnd)}" fill="${stroke}"/>`,
+      `<polygon points="${round(csX + csSize - csInset)},${round(csY + csInset)} ${round(csX + csSize - csInset - arrowEnd)},${round(csY + csInset)} ${round(csX + csSize - csInset)},${round(csY + csInset + arrowEnd)}" fill="${stroke}"/>`,
+      `<polygon points="${round(csX + csSize - csInset)},${round(csY + csSize - csInset)} ${round(csX + csSize - csInset - arrowEnd)},${round(csY + csSize - csInset)} ${round(csX + csSize - csInset)},${round(csY + csSize - csInset - arrowEnd)}" fill="${stroke}"/>`,
+      `<polygon points="${round(csX + csInset)},${round(csY + csSize - csInset)} ${round(csX + csInset + arrowEnd)},${round(csY + csSize - csInset)} ${round(csX + csInset)},${round(csY + csSize - csInset - arrowEnd)}" fill="${stroke}"/>`
     ].join("");
   }
   if (shape === "firewall") {

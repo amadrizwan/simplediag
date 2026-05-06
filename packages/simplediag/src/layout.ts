@@ -73,6 +73,8 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
       y = railTopY(item.min) - labelClearance - height;
     } else if (item.node.placement === "bottom") {
       y = railBottomY(item.max) + labelClearance;
+    } else if (item.trunk) {
+      y = railTopY(item.min) + shape.railHeight / 2 - height / 2;
     } else {
       y =
         item.max === item.min
@@ -142,14 +144,15 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
 function nodeInterval(
   node: ResolvedNode,
   networkById: Map<string, ResolvedNetwork>
-): { node: ResolvedNode; min: number; max: number } {
+): { node: ResolvedNode; min: number; max: number; trunk: boolean } {
   const orders = node.attachments
     .map((attachment) => networkById.get(attachment.networkId)?.rowOrder)
     .filter((value): value is number => value !== undefined);
-  if (orders.length === 0) return { node, min: 0, max: 0 };
+  if (orders.length === 0) return { node, min: 0, max: 0, trunk: false };
   const min = Math.min(...orders);
   const max = Math.max(...orders);
-  return { node, min, max };
+  const trunk = orders.length >= 2 && min === max;
+  return { node, min, max, trunk };
 }
 
 function firstAvailableColumn(
@@ -305,7 +308,9 @@ function placeDropLines(
   for (const node of diagram.nodes) {
     const placed = nodeById.get(node.id);
     if (!placed) continue;
-    for (const attachment of node.attachments) {
+    const attachments = node.attachments;
+    for (let idx = 0; idx < attachments.length; idx += 1) {
+      const attachment = attachments[idx]!;
       const rail = railByNetwork.get(attachment.networkId);
       if (!rail) continue;
       const railTop = rail.y;
@@ -318,7 +323,7 @@ function placeDropLines(
         id: `drop-${node.id}-${attachment.networkId}`,
         nodeId: node.id,
         networkId: attachment.networkId,
-        x: placed.centerX,
+        x: attachmentX(placed, idx, attachments.length),
         y1: railY,
         y2: nodeY,
         label: attachment.address
@@ -326,6 +331,13 @@ function placeDropLines(
     }
   }
   return out;
+}
+
+function attachmentX(node: InternalPlacedNode, index: number, count: number): number {
+  if (count <= 1) return node.centerX;
+  const inset = Math.min(node.width * 0.18, 16);
+  const usable = node.width - 2 * inset;
+  return node.x + inset + (usable * index) / Math.max(1, count - 1);
 }
 
 function placeJunctions(
@@ -339,14 +351,16 @@ function placeJunctions(
   for (const node of diagram.nodes) {
     const placed = nodeById.get(node.id);
     if (!placed) continue;
-    for (const attachment of node.attachments) {
+    const attachments = node.attachments;
+    for (let idx = 0; idx < attachments.length; idx += 1) {
+      const attachment = attachments[idx]!;
       const rail = railByNetwork.get(attachment.networkId);
       if (!rail) continue;
       out.push({
         id: `junction-${node.id}-${attachment.networkId}`,
         nodeId: node.id,
         networkId: attachment.networkId,
-        x: placed.centerX,
+        x: attachmentX(placed, idx, attachments.length),
         y: rail.y + rail.height / 2
       });
     }

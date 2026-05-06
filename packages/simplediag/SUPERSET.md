@@ -304,7 +304,34 @@ draw drop-lines dashed to distinguish "logical attachment" from "direct
 cable run". Pairs naturally with the per-network `style = dashed` for
 the rail itself.
 
-### 24. Build & distribution
+### 24. In-row trunk placement
+
+When a node is multi-homed across networks that all share the same `row`,
+its rail-min and rail-max collapse to a single Y-level. simplediag detects
+this case and places the node **on** the rail (centered vertically inside
+`shape.railHeight`) rather than between two rails. The node visually reads
+as a switch / aggregator sitting on the segment it bridges.
+
+```nwdiag
+network o_and_m_1 { row = "O&M"; ...; sw1 [shape = switch]; }
+network o_and_m_2 { row = "O&M"; sw1; sw2 [shape = switch]; ... }
+```
+
+`sw1` is attached to two networks but both share the `O&M` row, so it sits
+on the row's rail — bridging the two segments visibly. Nodes that span
+*different* rows still center between their attached rails as before.
+
+### 25. Per-attachment drop-line spreading
+
+Nodes attached to a single rail at multiple distinct points (e.g. a server
+that funnels several drops into one segment) now have their drop-lines
+spread evenly across `node.width × 0.18 .. node.width − 0.18`. Each
+attachment lands at a distinct X within the node footprint instead of all
+stacking on the centerline. Junction markers and rail intersections follow
+suit. The visual reads as multiple cables descending from distinct ports
+on the host, matching real network architecture diagrams.
+
+### 26. Build & distribution
 
 - ESM + CJS + `.d.ts` outputs (no Node-only APIs in `src/`)
 - Zero runtime dependencies
@@ -331,9 +358,6 @@ where possible (additive syntax, no breaking changes to existing scripts).
 - **Smarter route label placement** — currently uses centroid of the
   polyline points, which can clip near intermediate spurs. Should pin
   to the longest horizontal segment.
-- **Trunk / aggregate "switch on rail" sugar** — declare a node that
-  *is* the switch sitting on a rail row, rather than the
-  `multi-homed-with-shape=switch` pattern.
 - **Smarter `labelWidth`** — currently sized off `rowName ?? description
   ?? name`; could account for description+address combinations and
   truncation for very long row names.
