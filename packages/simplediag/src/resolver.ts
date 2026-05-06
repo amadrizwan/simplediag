@@ -15,13 +15,23 @@ import type {
   ResolvedNetwork,
   ResolvedNode,
   ResolvedPeerLink,
+  ResolvedRoute,
   ResolveOptions,
   ResolveResult,
   SourceRange
 } from "./types";
 import { diagnostic, uniqueId } from "./utils";
 
-const knownProperties = new Set(["address", "color", "width", "description", "shape", "stacked"]);
+const knownProperties = new Set([
+  "address",
+  "color",
+  "textcolor",
+  "width",
+  "description",
+  "shape",
+  "stacked",
+  "numbered"
+]);
 const knownShapes = new Set<NodeShape>([
   "rectangle",
   "database",
@@ -64,11 +74,13 @@ interface State {
   nodes: Map<string, ResolvedNode>;
   groups: ResolvedGroup[];
   peerLinks: ResolvedPeerLink[];
+  routes: ResolvedRoute[];
   defaults: DiagramDefaults;
   diagnostics: Diagnostic[];
   usedNetworkIds: Set<string>;
   usedGroupIds: Set<string>;
   groupMembership: Map<string, string>;
+  numberedCounter: number;
 }
 
 export function resolve(ast: DiagramAst, _options: ResolveOptions = {}): ResolveResult {
@@ -77,11 +89,13 @@ export function resolve(ast: DiagramAst, _options: ResolveOptions = {}): Resolve
     nodes: new Map(),
     groups: [],
     peerLinks: [],
+    routes: [],
     defaults: {},
     diagnostics: [],
     usedNetworkIds: new Set(),
     usedGroupIds: new Set(),
-    groupMembership: new Map()
+    groupMembership: new Map(),
+    numberedCounter: 0
   };
 
   for (const statement of ast.statements) {
@@ -123,6 +137,7 @@ export function resolve(ast: DiagramAst, _options: ResolveOptions = {}): Resolve
   }
 
   validatePeerLinks(state);
+  validateRoutes(state);
   validateAddresses(state);
 
   const diagram: ResolvedDiagram = {
@@ -131,6 +146,7 @@ export function resolve(ast: DiagramAst, _options: ResolveOptions = {}): Resolve
     nodes: [...state.nodes.values()].sort((a, b) => a.order - b.order),
     groups: state.groups,
     peerLinks: state.peerLinks,
+    routes: state.routes,
     defaults: state.defaults,
     diagnostics: state.diagnostics
   };
@@ -161,6 +177,16 @@ function visit(statement: AstStatement, state: State, context: Context): void {
       };
       applyPeerLinkAttributes(link, statement.attributes, state, statement.loc);
       state.peerLinks.push(link);
+      break;
+    }
+    case "Route": {
+      const route: ResolvedRoute = {
+        id: `route-${state.routes.length + 1}`,
+        nodes: statement.nodes,
+        loc: statement.loc
+      };
+      applyRouteAttributes(route, statement.attributes, state, statement.loc);
+      state.routes.push(route);
       break;
     }
   }
@@ -389,6 +415,36 @@ function applyPeerLinkAttributes(
   }
 }
 
+function applyRouteAttributes(
+  route: ResolvedRoute,
+  attributes: AttributeMap,
+  state: State,
+  loc: SourceRange
+): void {
+  for (const [name, value] of Object.entries(attributes)) {
+    const key = name.toLowerCase();
+    if (!knownLinkAttrs.has(key)) {
+      state.diagnostics.push(
+        diagnostic("warning", "resolve.unknownAttribute", `Unknown route attribute "${name}".`, loc)
+      );
+      continue;
+    }
+    const text = stringify(value);
+    if (key === "label") route.label = text;
+    if (key === "color") route.color = text;
+    if (key === "style") {
+      const style = text.toLowerCase();
+      if (linkStyles.has(style as "solid" | "dashed" | "dotted")) {
+        route.style = style as "solid" | "dashed" | "dotted";
+      } else {
+        state.diagnostics.push(
+          diagnostic("warning", "resolve.unknownLinkStyle", `Unknown route style "${text}", using solid.`, loc)
+        );
+      }
+    }
+  }
+}
+
 function applyNodeAttributes(
   node: ResolvedNode,
   attributes: AttributeMap,
@@ -412,6 +468,19 @@ function applyNodeAttributes(
     }
     if (key === "stacked") {
       node.stacked = typeof value === "boolean" ? value : text.toLowerCase() !== "false";
+    }
+    if (key === "textcolor") node.textColor = text;
+    if (key === "numbered") {
+      const num = typeof value === "number" ? value : Number(text);
+      if (typeof value === "boolean" && value) {
+        state.numberedCounter += 1;
+        node.numbered = state.numberedCounter;
+      } else if (Number.isFinite(num)) {
+        node.numbered = num;
+      } else if (text.toLowerCase() === "true") {
+        state.numberedCounter += 1;
+        node.numbered = state.numberedCounter;
+      }
     }
   }
 }
@@ -454,6 +523,18 @@ function validatePeerLinks(state: State): void {
     }
     if (!state.nodes.has(link.to)) {
       state.diagnostics.push(diagnostic("error", "resolve.unresolvedLink", `Unknown peer link node "${link.to}".`, link.loc));
+    }
+  }
+}
+
+function validateRoutes(state: State): void {
+  for (const route of state.routes) {
+    for (const id of route.nodes) {
+      if (!state.nodes.has(id)) {
+        state.diagnostics.push(
+          diagnostic("error", "resolve.unresolvedRoute", `Unknown route node "${id}".`, route.loc)
+        );
+      }
     }
   }
 }

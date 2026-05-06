@@ -139,7 +139,43 @@ nwdiag
 The opening `{` may sit on its own line (or the next non-empty line). Some
 nwdiag parsers accept this, some don't — simplediag explicitly does.
 
-### 11. Build & distribution
+### 11. Per-node `textcolor`
+
+```nwdiag
+web [textcolor = "#1f6feb"];
+```
+
+Overrides the node label's text colour (and the `numbered` badge text), with
+fallback to `theme.colors.text`. Distinct from `color`, which is the node's
+fill.
+
+### 12. Per-node `numbered`
+
+```nwdiag
+web1 [numbered = true];   # auto-increment
+web2 [numbered = true];   # auto-increment (next value)
+db   [numbered = 99];     # explicit
+```
+
+Renders a small badge in the top-right corner of the node containing the
+number. `true` opts into a global counter; an integer pins the specific
+number.
+
+### 13. `route` syntax for explicit waypoints
+
+```nwdiag
+route web -> firewall -> db [label = "request path", color = "blue"];
+route a -- b -- c;   # `--` separator also accepted
+```
+
+A route is a connected polyline through two or more nodes, drawn in a lane
+below the bottommost rail. Each waypoint visits the corresponding node
+(vertical spur up, back to lane, continue). Route lanes are placed below
+peer-link lanes so they don't visually mix. Routes accept `label`, `color`,
+`style` like peer-link attributes; default style is `solid` (versus
+`dashed` for peer links) so the difference reads at a glance.
+
+### 14. Build & distribution
 
 - ESM + CJS + `.d.ts` outputs (no Node-only APIs in `src/`)
 - Zero runtime dependencies
@@ -156,18 +192,16 @@ where possible (additive syntax, no breaking changes to existing scripts).
 
 ### Syntax additions
 
-- **`textcolor` per-node** — explicit text colour, distinct from `color`
-  (which is fill).
-- **`numbered` per-node** — auto-incrementing index in the rendered label.
 - **`hidden = true`** on nodes — keep node in the resolved model but skip
   rendering (useful for ports / connection points).
 - **HTML / multi-line labels** — `description = "Web\nserver"` rendered as
   two lines; or `<<...>>` HTML-style labels.
-- **`route NODE -> NODE -> NODE`** — explicit routing path through nodes,
-  rendered as a connected polyline.
 - **`peer A B C ...`** as multi-endpoint peer link sugar.
 - **`linecolor` / `linestyle` defaults** on networks (cascade to drop
   lines and node-to-rail connections, not just the rail itself).
+- **Smarter route label placement** — currently uses centroid of the
+  polyline points, which can clip near intermediate spurs. Should pin
+  to the longest horizontal segment.
 
 ### Shape additions
 

@@ -1,0 +1,19 @@
+nwdiag {
+  span_height = 140;
+
+  network edge {
+    address = "203.0.113.0/24";
+    fw [address = ".1", shape = firewall, numbered = true];
+    lb [address = ".2", shape = loadbalancer, numbered = true, textcolor = "#1f6feb"];
+  }
+  network app {
+    address = "10.0.0.0/24";
+    fw [address = ".1"];
+    lb [address = ".2"];
+    web1 [address = ".10", shape = server, numbered = true];
+    web2 [address = ".11", shape = server, numbered = true];
+    db [address = ".20", shape = database, numbered = 99];
+  }
+
+  route fw -> lb -> web1 -> db [label = "request path", color = "#1f6feb"];
+}

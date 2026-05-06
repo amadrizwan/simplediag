@@ -85,6 +85,22 @@ export function render(layoutResult: LayoutResult, options: RenderOptions = {}):
     }
   }
 
+  for (const route of layoutResult.routes) {
+    const points = route.points.map((point) => `${round(point.x)},${round(point.y)}`).join(" ");
+    const color = route.color ?? theme.colors.linkStroke;
+    const style = route.style ?? "solid";
+    const dash = style === "solid" ? "" : style === "dotted" ? ' stroke-dasharray="1 4"' : ' stroke-dasharray="4 4"';
+    parts.push(
+      `<polyline points="${points}" fill="none" stroke="${escapeXml(color)}" stroke-width="${theme.strokes.linkWidth * 1.4}"${dash}/>`
+    );
+    if (route.label && route.points.length >= 2) {
+      const mid = midpoint(route.points);
+      parts.push(
+        `<text x="${round(mid.x)}" y="${round(mid.y - 4)}" text-anchor="middle" font-size="${theme.typography.labelFontSize}" fill="${escapeXml(theme.colors.mutedText)}">${escapeXml(route.label)}</text>`
+      );
+    }
+  }
+
   for (const line of layoutResult.dropLines) {
     parts.push(
       `<line x1="${round(line.x)}" y1="${round(line.y1)}" x2="${round(line.x)}" y2="${round(line.y2)}" stroke="${escapeXml(theme.colors.linkStroke)}" stroke-width="${theme.strokes.linkWidth}"/>`
@@ -119,6 +135,7 @@ export function renderDiagnostics(diagnostics: Diagnostic[], options: RenderOpti
 function renderNode(node: PlacedNode, theme: SimplediagTheme): string {
   const fill = escapeXml(node.color ?? theme.colors.nodeFill);
   const stroke = escapeXml(theme.colors.nodeStroke);
+  const textFill = escapeXml(node.textColor ?? theme.colors.text);
   const labelX = round(node.x + node.width / 2);
   const labelY = round(node.y + node.height / 2 + theme.typography.fontSize / 3);
   const stackParts: string[] = [];
@@ -130,10 +147,21 @@ function renderNode(node: PlacedNode, theme: SimplediagTheme): string {
       );
     }
   }
+  const badgeParts: string[] = [];
+  if (node.numbered !== undefined) {
+    const r = Math.max(8, theme.typography.labelFontSize * 0.85);
+    const cx = node.x + node.width - r * 0.4;
+    const cy = node.y + r * 0.4;
+    badgeParts.push(
+      `<circle cx="${round(cx)}" cy="${round(cy)}" r="${round(r)}" fill="${escapeXml(theme.colors.background)}" stroke="${stroke}" stroke-width="${theme.strokes.nodeWidth}"/>`,
+      `<text x="${round(cx)}" y="${round(cy + theme.typography.labelFontSize / 3)}" text-anchor="middle" font-size="${theme.typography.labelFontSize}" fill="${textFill}">${escapeXml(String(node.numbered))}</text>`
+    );
+  }
   return [
     ...stackParts,
     renderShape(node.shape, node.x, node.y, node.width, node.height, fill, stroke, theme),
-    `<text x="${labelX}" y="${labelY}" text-anchor="middle" font-size="${theme.typography.fontSize}" fill="${escapeXml(theme.colors.text)}">${escapeXml(node.label)}</text>`
+    `<text x="${labelX}" y="${labelY}" text-anchor="middle" font-size="${theme.typography.fontSize}" fill="${textFill}">${escapeXml(node.label)}</text>`,
+    ...badgeParts
   ].join("");
 }
 

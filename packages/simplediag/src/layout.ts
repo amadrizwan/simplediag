@@ -9,6 +9,7 @@ import type {
   PlacedNode,
   PlacedPeerLink,
   PlacedRail,
+  PlacedRoute,
   ResolvedDiagram,
   ResolvedNetwork,
   ResolvedNode
@@ -81,6 +82,8 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
       span,
       shape: item.node.shape,
       color: item.node.color,
+      textColor: item.node.textColor,
+      numbered: item.node.numbered,
       stacked: item.node.stacked,
       centerX: x + width / 2,
       centerY: y + height / 2,
@@ -102,7 +105,8 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
   const groups = placeGroups(diagram, placedNodes, spacing, rails);
   const dropLines = placeDropLines(diagram, placedNodes, rails);
   const peerLinks = placePeerLinks(diagram, placedNodes, rails, spacing);
-  const bounds = computeBounds(rails, placedNodes, groups, labels, peerLinks, spacing.margin);
+  const routes = placeRoutes(diagram, placedNodes, rails, spacing, peerLinks);
+  const bounds = computeBounds(rails, placedNodes, groups, labels, peerLinks, routes, spacing.margin);
 
   return {
     diagram,
@@ -112,6 +116,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
     groups,
     dropLines,
     peerLinks,
+    routes,
     labels,
     diagnostics
   };
@@ -379,12 +384,59 @@ function placePeerLinks(
   });
 }
 
+function placeRoutes(
+  diagram: ResolvedDiagram,
+  nodes: InternalPlacedNode[],
+  rails: PlacedRail[],
+  spacing: typeof defaultTheme.spacing,
+  peerLinks: PlacedPeerLink[]
+): PlacedRoute[] {
+  if (diagram.routes.length === 0) return [];
+  const nodeById = new Map(nodes.map((node) => [node.nodeId, node]));
+  const bottomRailY = rails.length > 0 ? Math.max(...rails.map((r) => r.y + r.height)) : 0;
+  const bottomNodeY = nodes.length > 0 ? Math.max(...nodes.map((n) => n.y + n.height)) : bottomRailY;
+  const lowestPeerY = peerLinks.length > 0
+    ? Math.max(...peerLinks.flatMap((l) => l.points.map((p) => p.y)))
+    : Math.max(bottomRailY, bottomNodeY);
+  const baseLaneY = lowestPeerY + spacing.labelGap + 16;
+  const laneStep = 22;
+
+  return diagram.routes.flatMap((route, index) => {
+    const placed = route.nodes.map((id) => nodeById.get(id)).filter((n): n is InternalPlacedNode => Boolean(n));
+    if (placed.length < 2) return [];
+    const laneY = baseLaneY + index * laneStep;
+    const points: { x: number; y: number }[] = [];
+    points.push({ x: placed[0]!.centerX, y: placed[0]!.y + placed[0]!.height });
+    points.push({ x: placed[0]!.centerX, y: laneY });
+    for (let i = 1; i < placed.length - 1; i += 1) {
+      const node = placed[i]!;
+      points.push({ x: node.centerX, y: laneY });
+      points.push({ x: node.centerX, y: node.y + node.height });
+      points.push({ x: node.centerX, y: laneY });
+    }
+    const last = placed[placed.length - 1]!;
+    points.push({ x: last.centerX, y: laneY });
+    points.push({ x: last.centerX, y: last.y + last.height });
+    return [
+      {
+        id: route.id,
+        nodeIds: route.nodes,
+        points,
+        label: route.label,
+        color: route.color,
+        style: route.style
+      }
+    ];
+  });
+}
+
 function computeBounds(
   rails: PlacedRail[],
   nodes: InternalPlacedNode[],
   groups: PlacedGroup[],
   labels: PlacedLabel[],
   peerLinks: PlacedPeerLink[],
+  routes: PlacedRoute[],
   margin: number
 ) {
   const xs = [
@@ -393,7 +445,8 @@ function computeBounds(
     ...nodes.flatMap((node) => [node.x, node.x + node.width]),
     ...groups.flatMap((group) => [group.x, group.x + group.width]),
     ...labels.map((label) => label.x),
-    ...peerLinks.flatMap((link) => link.points.map((p) => p.x))
+    ...peerLinks.flatMap((link) => link.points.map((p) => p.x)),
+    ...routes.flatMap((route) => route.points.map((p) => p.x))
   ];
   const ys = [
     0,
@@ -401,7 +454,8 @@ function computeBounds(
     ...nodes.flatMap((node) => [node.y, node.y + node.height]),
     ...groups.flatMap((group) => [group.y, group.y + group.height]),
     ...labels.map((label) => label.y),
-    ...peerLinks.flatMap((link) => link.points.map((p) => p.y))
+    ...peerLinks.flatMap((link) => link.points.map((p) => p.y)),
+    ...routes.flatMap((route) => route.points.map((p) => p.y))
   ];
   const minX = Math.min(...xs) - margin;
   const minY = Math.min(...ys) - margin;

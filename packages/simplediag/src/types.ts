@@ -38,7 +38,8 @@ export type AstStatement =
   | GroupAst
   | NodeAst
   | PropertyAst
-  | PeerLinkAst;
+  | PeerLinkAst
+  | RouteAst;
 
 export interface NetworkAst {
   kind: "Network";
@@ -78,6 +79,13 @@ export interface PeerLinkAst {
 
 export type LinkStyle = "solid" | "dashed" | "dotted";
 
+export interface RouteAst {
+  kind: "Route";
+  nodes: string[];
+  attributes: AttributeMap;
+  loc: SourceRange;
+}
+
 export interface ParseOptions {
   diagramType?: DiagramType;
 }
@@ -93,8 +101,27 @@ export interface ResolvedDiagram {
   nodes: ResolvedNode[];
   groups: ResolvedGroup[];
   peerLinks: ResolvedPeerLink[];
+  routes: ResolvedRoute[];
   defaults: DiagramDefaults;
   diagnostics: Diagnostic[];
+}
+
+export interface ResolvedRoute {
+  id: string;
+  nodes: string[];
+  label?: string;
+  color?: string;
+  style?: LinkStyle;
+  loc?: SourceRange;
+}
+
+export interface PlacedRoute {
+  id: string;
+  nodeIds: string[];
+  points: Point[];
+  label?: string;
+  color?: string;
+  style?: LinkStyle;
 }
 
 export interface DiagramDefaults {
@@ -128,6 +155,8 @@ export interface ResolvedNode {
   order: number;
   description?: string;
   color?: string;
+  textColor?: string;
+  numbered?: number;
   shape: NodeShape;
   width: number;
   stacked: boolean;
@@ -229,6 +258,8 @@ export interface PlacedNode {
   span: number;
   shape: NodeShape;
   color?: string;
+  textColor?: string;
+  numbered?: number;
   stacked: boolean;
 }
 
@@ -279,6 +310,7 @@ export interface LayoutResult {
   groups: PlacedGroup[];
   dropLines: PlacedDropLine[];
   peerLinks: PlacedPeerLink[];
+  routes: PlacedRoute[];
   labels: PlacedLabel[];
   diagnostics: Diagnostic[];
 }

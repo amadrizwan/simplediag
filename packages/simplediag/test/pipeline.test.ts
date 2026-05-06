@@ -249,6 +249,72 @@ nwdiag {
     expect(result.svg).toMatch(/<path d="M [\d.]+ /);
   });
 
+  it("applies textcolor on a node", () => {
+    const result = renderFromSource(`
+nwdiag {
+  network n {
+    web [textcolor = "#ff00aa"];
+  }
+}
+`);
+    expect(result.svg).toContain("#ff00aa");
+  });
+
+  it("renders auto-incrementing numbered badges", () => {
+    const parsed = parse(`
+nwdiag {
+  network n {
+    a [numbered = true];
+    b [numbered = true];
+    c [numbered = 7];
+  }
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const nodes = resolved.diagram?.nodes ?? [];
+    expect(nodes.find((n) => n.id === "a")?.numbered).toBe(1);
+    expect(nodes.find((n) => n.id === "b")?.numbered).toBe(2);
+    expect(nodes.find((n) => n.id === "c")?.numbered).toBe(7);
+  });
+
+  it("parses route syntax with -> and -- separators and attributes", () => {
+    const parsed = parse(`
+nwdiag {
+  network n {
+    a;
+    b;
+    c;
+    d;
+  }
+  route a -> b -> c [label = "path", color = "red"];
+  route a -- b -- d;
+}
+`);
+    expect(parsed.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    const resolved = resolve(parsed.ast!);
+    expect(resolved.diagram?.routes).toHaveLength(2);
+    const first = resolved.diagram?.routes[0];
+    expect(first?.nodes).toEqual(["a", "b", "c"]);
+    expect(first?.label).toBe("path");
+    expect(first?.color).toBe("red");
+    const second = resolved.diagram?.routes[1];
+    expect(second?.nodes).toEqual(["a", "b", "d"]);
+  });
+
+  it("validates route node references", () => {
+    const parsed = parse(`
+nwdiag {
+  network n {
+    a;
+  }
+  route a -> ghost;
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const errors = resolved.diagnostics.filter((d) => d.code === "resolve.unresolvedRoute");
+    expect(errors).toHaveLength(1);
+  });
+
   it("throws when errorMode is throw", () => {
     expect(() =>
       renderFromSource(

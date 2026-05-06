@@ -123,6 +123,22 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
       continue;
     }
 
+    const route = /^route\s+(.+?)(?:\s*\[(.*)\])?\s*;?$/i.exec(stripped);
+    if (route) {
+      const path = (route[1] ?? "").split(/\s*(?:->|--)\s*/).map((s) => s.trim()).filter((s) => s.length > 0);
+      if (path.length >= 2) {
+        addStatement(stack, {
+          kind: "Route",
+          nodes: path,
+          attributes: parseAttributes(route[2] ?? "", diagnostics, loc),
+          loc
+        });
+        continue;
+      }
+      diagnostics.push(diagnostic("error", "parse.invalidRoute", "Route requires at least two nodes.", loc));
+      continue;
+    }
+
     const peerLink = /^([^\s\[\]{};=]+)\s*--\s*([^\s\[\]{};=]+)(?:\s*\[(.*)\])?\s*;?$/.exec(stripped);
     if (peerLink) {
       addStatement(stack, {

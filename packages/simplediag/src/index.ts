@@ -25,6 +25,7 @@ export type {
   PlacedNode,
   PlacedPeerLink,
   PlacedRail,
+  PlacedRoute,
   Point,
   PropertyAst,
   RenderFromSourceOptions,
@@ -39,6 +40,8 @@ export type {
   ResolvedNetwork,
   ResolvedNode,
   ResolvedPeerLink,
+  ResolvedRoute,
+  RouteAst,
   SimplediagTheme,
   SourceLocation,
   SourceRange
