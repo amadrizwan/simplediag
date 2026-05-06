@@ -273,15 +273,20 @@ function renderShape(
     ].join("");
   }
   if (shape === "switch") {
-    const bodyH = height * 0.86;
-    const footY = y + bodyH;
-    const footH = height * 0.1;
-    const padX = width * 0.04;
+    const scale = 0.62;
+    const drawW = width * scale;
+    const drawH = height * scale;
+    const drawX = x + (width - drawW) / 2;
+    const drawY = y + (height - drawH) / 2;
+    const bodyH = drawH * 0.86;
+    const footY = drawY + bodyH;
+    const footH = drawH * 0.1;
+    const padX = drawW * 0.04;
     const padY = bodyH * 0.18;
-    const portsRight = x + width * 0.66;
-    const portsLeft = x + padX;
-    const portsTop = y + padY;
-    const portsBottom = y + bodyH - padY;
+    const portsRight = drawX + drawW * 0.66;
+    const portsLeft = drawX + padX;
+    const portsTop = drawY + padY;
+    const portsBottom = drawY + bodyH - padY;
     const portCols = 5;
     const portRows = 2;
     const portW = (portsRight - portsLeft) / portCols * 0.78;
@@ -299,14 +304,14 @@ function renderShape(
         );
       }
     }
-    const csSize = Math.min(width * 0.26, bodyH * 0.7);
-    const csX = x + width - padX - csSize;
-    const csY = y + (bodyH - csSize) / 2;
+    const csSize = Math.min(drawW * 0.26, bodyH * 0.7);
+    const csX = drawX + drawW - padX - csSize;
+    const csY = drawY + (bodyH - csSize) / 2;
     const csInset = csSize * 0.18;
     const arrowEnd = csSize * 0.14;
     return [
-      `<rect x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(bodyH)}" rx="${theme.shapes.cornerRadius}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
-      `<rect x="${round(x - width * 0.015)}" y="${round(footY)}" width="${round(width * 1.03)}" height="${round(footH)}" rx="${round(footH * 0.4)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
+      `<rect x="${round(drawX)}" y="${round(drawY)}" width="${round(drawW)}" height="${round(bodyH)}" rx="${theme.shapes.cornerRadius}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
+      `<rect x="${round(drawX - drawW * 0.015)}" y="${round(footY)}" width="${round(drawW * 1.03)}" height="${round(footH)}" rx="${round(footH * 0.4)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
       ...portsSvg,
       `<rect x="${round(csX)}" y="${round(csY)}" width="${round(csSize)}" height="${round(csSize)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw * 0.7}"/>`,
       `<line x1="${round(csX + csInset)}" y1="${round(csY + csInset)}" x2="${round(csX + csSize - csInset)}" y2="${round(csY + csSize - csInset)}" stroke="${stroke}" stroke-width="${sw * 0.7}"/>`,
