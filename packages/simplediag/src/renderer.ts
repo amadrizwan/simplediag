@@ -112,9 +112,19 @@ export function render(layoutResult: LayoutResult, options: RenderOptions = {}):
     }
   }
 
+  const connectionStyle = layoutResult.diagram.defaults.connectionStyle ?? "solid";
+  const connectionDash =
+    connectionStyle === "dashed" ? ' stroke-dasharray="4 3"' : connectionStyle === "dotted" ? ' stroke-dasharray="1 3"' : "";
   for (const line of layoutResult.dropLines) {
     parts.push(
-      `<line x1="${round(line.x)}" y1="${round(line.y1)}" x2="${round(line.x)}" y2="${round(line.y2)}" stroke="${escapeXml(theme.colors.linkStroke)}" stroke-width="${theme.strokes.linkWidth}"/>`
+      `<line x1="${round(line.x)}" y1="${round(line.y1)}" x2="${round(line.x)}" y2="${round(line.y2)}" stroke="${escapeXml(theme.colors.linkStroke)}" stroke-width="${theme.strokes.linkWidth}"${connectionDash}/>`
+    );
+  }
+
+  const junctionR = Math.max(2.5, theme.typography.labelFontSize * 0.22);
+  for (const j of layoutResult.junctions) {
+    parts.push(
+      `<circle cx="${round(j.x)}" cy="${round(j.y)}" r="${round(junctionR)}" fill="${escapeXml(theme.colors.linkStroke)}"/>`
     );
   }
 

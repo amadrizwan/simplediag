@@ -7,6 +7,7 @@ import type {
   PlacedGroup,
   PlacedLabel,
   PlacedNode,
+  PlacedJunction,
   PlacedPeerLink,
   PlacedRail,
   PlacedRoute,
@@ -45,7 +46,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
   const labelWidth = Math.max(
     80,
     ...diagram.networks.map((network) =>
-      textWidth(network.description ?? network.name, typography.fontSize) +
+      textWidth(network.rowName ?? network.description ?? network.name, typography.fontSize) +
       (network.address ? textWidth(network.address, typography.labelFontSize) : 0)
     )
   );
@@ -118,6 +119,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
   const labels = placeLabels(diagram, rails, placedNodes, spacing, typography);
   const groups = placeGroups(diagram, placedNodes, spacing, rails);
   const dropLines = placeDropLines(diagram, placedNodes, rails);
+  const junctions = placeJunctions(diagram, placedNodes, rails);
   const peerLinks = placePeerLinks(diagram, placedNodes, rails, spacing);
   const routes = placeRoutes(diagram, placedNodes, rails, spacing, peerLinks);
   const bounds = computeBounds(rails, placedNodes, groups, labels, peerLinks, routes, spacing.margin);
@@ -126,9 +128,10 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
     diagram,
     bounds,
     rails,
-    nodes: placedNodes.map(({ centerX: _cx, centerY: _cy, minNetworkOrder: _min, maxNetworkOrder: _max, ...node }) => node),
+    nodes: placedNodes.map(({ centerX: _cx, centerY: _cy, minNetworkOrder: _min, maxNetworkOrder: _max, attachedNetworkIds: _ids, ...node }) => node),
     groups,
     dropLines,
+    junctions,
     peerLinks,
     routes,
     labels,
@@ -269,15 +272,10 @@ function placeGroups(
     const labelClearance = defaultTheme.typography.labelFontSize + 6;
     const railsAbove = rails.filter((rail) => rail.y + rail.height <= memberMinY);
     const x1 = Math.min(...members.map((node) => node.x)) - spacing.groupPadding;
-    let y1: number;
-    if (group.style === "label-only") {
-      y1 = memberMinY - spacing.groupPadding;
-    } else {
-      const minY = railsAbove.length > 0
-        ? Math.max(...railsAbove.map((rail) => rail.y + rail.height)) + labelClearance
-        : labelClearance;
-      y1 = Math.max(memberMinY - spacing.groupPadding, minY);
-    }
+    const minY = railsAbove.length > 0
+      ? Math.max(...railsAbove.map((rail) => rail.y + rail.height)) + labelClearance
+      : labelClearance;
+    const y1 = Math.max(memberMinY - spacing.groupPadding, minY);
     const x2 = Math.max(...members.map((node) => node.x + node.width)) + spacing.groupPadding;
     const y2 = Math.max(...members.map((node) => node.y + node.height)) + spacing.groupPadding;
     return [
@@ -324,6 +322,32 @@ function placeDropLines(
         y1: railY,
         y2: nodeY,
         label: attachment.address
+      });
+    }
+  }
+  return out;
+}
+
+function placeJunctions(
+  diagram: ResolvedDiagram,
+  nodes: InternalPlacedNode[],
+  rails: PlacedRail[]
+): PlacedJunction[] {
+  const nodeById = new Map(nodes.map((node) => [node.nodeId, node]));
+  const railByNetwork = new Map(rails.map((rail) => [rail.networkId, rail]));
+  const out: PlacedJunction[] = [];
+  for (const node of diagram.nodes) {
+    const placed = nodeById.get(node.id);
+    if (!placed) continue;
+    for (const attachment of node.attachments) {
+      const rail = railByNetwork.get(attachment.networkId);
+      if (!rail) continue;
+      out.push({
+        id: `junction-${node.id}-${attachment.networkId}`,
+        nodeId: node.id,
+        networkId: attachment.networkId,
+        x: placed.centerX,
+        y: rail.y + rail.height / 2
       });
     }
   }

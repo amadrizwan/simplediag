@@ -23,6 +23,7 @@ export type {
   PeerLinkAst,
   PlacedDropLine,
   PlacedGroup,
+  PlacedJunction,
   PlacedLabel,
   PlacedNode,
   PlacedPeerLink,

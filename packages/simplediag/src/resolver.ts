@@ -63,6 +63,7 @@ const defaultDirectives = new Set([
   "default_linecolor",
   "default_fontsize",
   "default_fontfamily",
+  "default_connection_style",
   "node_width",
   "node_height",
   "span_width",
@@ -378,6 +379,13 @@ function applyDefault(defaults: DiagramDefaults, key: string, value: AttributeVa
     case "default_fontfamily":
       defaults.fontFamily = text;
       break;
+    case "default_connection_style": {
+      const style = text.toLowerCase();
+      if (style === "solid" || style === "dashed" || style === "dotted") {
+        defaults.connectionStyle = style;
+      }
+      break;
+    }
     case "node_width":
       if (finiteNum !== undefined && finiteNum > 0) defaults.nodeWidth = finiteNum;
       break;

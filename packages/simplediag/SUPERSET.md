@@ -277,7 +277,34 @@ peer-link lanes so they don't visually mix. Routes accept `label`, `color`,
 `style` like peer-link attributes; default style is `solid` (versus
 `dashed` for peer links) so the difference reads at a glance.
 
-### 22. Build & distribution
+### 22. Junction markers at attachment points
+
+A small filled circle is rendered at every drop-line/rail intersection,
+making it visually clear *where* a multi-homed node attaches. The dot is
+sized proportional to `theme.typography.labelFontSize` and uses
+`theme.colors.linkStroke`. Matches the convention used in real network
+architecture diagrams (the SMSC reference uses dots at every attachment).
+
+`PlacedJunction[]` is exported on `LayoutResult` so consumers building
+custom renderers can position their own markers.
+
+### 23. `default_connection_style` directive
+
+```nwdiag
+nwdiag {
+  default_connection_style = dashed;
+  ...
+}
+```
+
+Sets the stroke style for *all* drop-lines (the connections between
+rails and their attached nodes). Accepts `solid` (default), `dashed`,
+or `dotted`. nwdiag's enterprise-style architectural diagrams typically
+draw drop-lines dashed to distinguish "logical attachment" from "direct
+cable run". Pairs naturally with the per-network `style = dashed` for
+the rail itself.
+
+### 24. Build & distribution
 
 - ESM + CJS + `.d.ts` outputs (no Node-only APIs in `src/`)
 - Zero runtime dependencies
@@ -304,13 +331,15 @@ where possible (additive syntax, no breaking changes to existing scripts).
 - **Smarter route label placement** — currently uses centroid of the
   polyline points, which can clip near intermediate spurs. Should pin
   to the longest horizontal segment.
-- **Junction markers at attachment points** — small filled circle where
-  drop-lines meet rails, for visual clarity when a long drop-line
-  passes through several rails at marked attachment points (the
-  upstream SMSC reference diagram convention).
 - **Trunk / aggregate "switch on rail" sugar** — declare a node that
   *is* the switch sitting on a rail row, rather than the
   `multi-homed-with-shape=switch` pattern.
+- **Smarter `labelWidth`** — currently sized off `rowName ?? description
+  ?? name`; could account for description+address combinations and
+  truncation for very long row names.
+- **Per-attachment style override** — `web [address = "10.0.0.1",
+  attachment_style = solid]` so a single drop-line can override the
+  diagram's `default_connection_style`.
 
 ### Shape additions
 

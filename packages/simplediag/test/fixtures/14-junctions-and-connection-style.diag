@@ -1,0 +1,33 @@
+nwdiag {
+  default_connection_style = dashed;
+  span_height = 130;
+
+  network o_and_m_1 {
+    row = "O&M";
+    s1a [shape = server, placement = top];
+    s2a [shape = server, placement = top];
+    sw1 [shape = switch];
+  }
+  network internal_1 { row = "Internal"; s1a; s2a; sw1; }
+  network o_and_m_2 {
+    row = "O&M";
+    s1b [shape = server, placement = top];
+    s2b [shape = server, placement = top];
+    sw2 [shape = switch];
+  }
+  network internal_2 { row = "Internal"; s1b; s2b; sw2; }
+  network others {
+    row = "Others";
+    style = dashed;
+    width = full;
+    s1a; s2a; s1b; s2b;
+  }
+  network insights {
+    row = "Internal (Insights)";
+    width = full;
+    insv1 [shape = server, placement = bottom];
+    insv2 [shape = server, placement = bottom];
+  }
+  group cap_smsc { description = "SMSC MMSC"; style = label-only; s1a; s2a; }
+  group cap_hosts { description = "Insights Hosts"; style = label-only; insv1; insv2; }
+}

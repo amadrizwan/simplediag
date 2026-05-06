@@ -136,6 +136,7 @@ export interface DiagramDefaults {
   nodeHeight?: number;
   spanWidth?: number;
   spanHeight?: number;
+  connectionStyle?: LinkStyle;
 }
 
 export interface ResolvedNetwork {
@@ -310,6 +311,14 @@ export interface PlacedPeerLink {
   style?: LinkStyle;
 }
 
+export interface PlacedJunction {
+  id: string;
+  nodeId: string;
+  networkId: string;
+  x: number;
+  y: number;
+}
+
 export interface PlacedLabel {
   id: string;
   text: string;
@@ -325,6 +334,7 @@ export interface LayoutResult {
   nodes: PlacedNode[];
   groups: PlacedGroup[];
   dropLines: PlacedDropLine[];
+  junctions: PlacedJunction[];
   peerLinks: PlacedPeerLink[];
   routes: PlacedRoute[];
   labels: PlacedLabel[];

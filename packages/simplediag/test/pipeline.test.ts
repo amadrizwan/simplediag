@@ -377,6 +377,35 @@ nwdiag {
     expect(result.svg).not.toMatch(/<rect[^>]+fill="#dcecf7"/);
   });
 
+  it("emits a junction marker for every node attachment", () => {
+    const parsed = parse(`
+nwdiag {
+  network n1 { web; }
+  network n2 { web; }
+  network n3 { web; }
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const placed = layout(resolved.diagram!);
+    const junctionsForWeb = placed.junctions.filter((j) => j.nodeId === "web");
+    expect(junctionsForWeb).toHaveLength(3);
+    for (const j of junctionsForWeb) {
+      expect(j.x).toBeGreaterThan(0);
+      expect(j.y).toBeGreaterThan(0);
+    }
+  });
+
+  it("default_connection_style applies dashed dasharray to drop lines", () => {
+    const result = renderFromSource(`
+nwdiag {
+  default_connection_style = dashed;
+  network n { web; }
+}
+`);
+    const dropLines = (result.svg ?? "").match(/<line[^>]*stroke-dasharray/g) ?? [];
+    expect(dropLines.length).toBeGreaterThan(0);
+  });
+
   it("group with style label-only skips the rectangle", () => {
     const result = renderFromSource(`
 nwdiag {
