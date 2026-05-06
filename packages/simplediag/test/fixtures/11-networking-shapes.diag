@@ -1,0 +1,29 @@
+nwdiag {
+  span_height = 130;
+
+  network internet {
+    address = "0.0.0.0/0";
+    cdn [shape = cloud];
+  }
+  network edge {
+    address = "203.0.113.0/24";
+    cdn [address = ".10"];
+    fw [address = ".1", shape = firewall];
+    lb [address = ".20", shape = loadbalancer];
+  }
+  network app {
+    address = "10.0.0.0/24";
+    fw [address = ".1"];
+    lb [address = ".2"];
+    sw [address = ".3", shape = switch];
+    web1 [address = ".10", shape = server];
+    web2 [address = ".11", shape = server];
+    db [address = ".20", shape = database];
+  }
+  network mgmt {
+    address = "10.99.0.0/24";
+    sw [address = ".1"];
+    rtr [address = ".2", shape = router];
+    admin [address = ".10", shape = client];
+  }
+}

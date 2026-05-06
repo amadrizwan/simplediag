@@ -146,7 +146,13 @@ export type NodeShape =
   | "roundedbox"
   | "circle"
   | "ellipse"
-  | "diamond";
+  | "diamond"
+  | "router"
+  | "switch"
+  | "firewall"
+  | "server"
+  | "client"
+  | "loadbalancer";
 
 export interface ResolvedAttachment {
   id: string;

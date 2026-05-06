@@ -26,8 +26,8 @@
     "test": "vitest run",
     "check:license": "node ./scripts/check-license-isolation.mjs"
   },
-  "dependencies": {},
   "devDependencies": {
+    "@types/node": "^25.6.0",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

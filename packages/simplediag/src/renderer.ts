@@ -209,6 +209,114 @@ function renderShape(
     const points = `${round(cx)},${round(y)} ${round(x + width)},${round(cy)} ${round(cx)},${round(y + height)} ${round(x)},${round(cy)}`;
     return `<polygon points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
   }
+  if (shape === "router") {
+    const inset = width * 0.1;
+    const bodyX = x + inset;
+    const bodyW = width - 2 * inset;
+    const radius = height / 2;
+    const cy = y + height / 2;
+    const arrow = inset * 0.9;
+    const head = height * 0.25;
+    return [
+      `<rect x="${round(bodyX)}" y="${round(y)}" width="${round(bodyW)}" height="${round(height)}" rx="${round(radius)}" ry="${round(radius)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
+      `<polygon points="${round(x)},${round(cy)} ${round(bodyX)},${round(cy - head)} ${round(bodyX)},${round(cy + head)}" fill="${stroke}"/>`,
+      `<polygon points="${round(x + width)},${round(cy)} ${round(bodyX + bodyW)},${round(cy - head)} ${round(bodyX + bodyW)},${round(cy + head)}" fill="${stroke}"/>`
+    ].join("");
+  }
+  if (shape === "switch") {
+    const tabH = height * 0.18;
+    const arrowSize = tabH * 0.7;
+    const portCount = 4;
+    const arrows: string[] = [];
+    for (let i = 0; i < portCount; i += 1) {
+      const px = x + width * ((i + 0.5) / portCount);
+      arrows.push(
+        `<polygon points="${round(px - arrowSize / 2)},${round(y + tabH)} ${round(px + arrowSize / 2)},${round(y + tabH)} ${round(px)},${round(y + tabH + arrowSize)}" fill="${stroke}"/>`,
+        `<polygon points="${round(px - arrowSize / 2)},${round(y + height - tabH)} ${round(px + arrowSize / 2)},${round(y + height - tabH)} ${round(px)},${round(y + height - tabH - arrowSize)}" fill="${stroke}"/>`
+      );
+    }
+    return [
+      `<rect x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(height)}" rx="${theme.shapes.cornerRadius}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
+      ...arrows
+    ].join("");
+  }
+  if (shape === "firewall") {
+    const rows = 3;
+    const cols = 5;
+    const rowH = height / rows;
+    const colW = width / cols;
+    const bricks: string[] = [
+      `<rect x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(height)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`
+    ];
+    for (let r = 0; r < rows; r += 1) {
+      const rowY = y + r * rowH;
+      bricks.push(
+        `<line x1="${round(x)}" y1="${round(rowY)}" x2="${round(x + width)}" y2="${round(rowY)}" stroke="${stroke}" stroke-width="${sw * 0.6}"/>`
+      );
+      const offset = r % 2 === 1 ? colW / 2 : 0;
+      for (let c = 0; c < cols; c += 1) {
+        const lx = x + offset + c * colW;
+        if (lx > x && lx < x + width) {
+          bricks.push(
+            `<line x1="${round(lx)}" y1="${round(rowY)}" x2="${round(lx)}" y2="${round(rowY + rowH)}" stroke="${stroke}" stroke-width="${sw * 0.6}"/>`
+          );
+        }
+      }
+    }
+    return bricks.join("");
+  }
+  if (shape === "server") {
+    const slots = 4;
+    const slotPad = height * 0.08;
+    const slotH = (height - slotPad * (slots + 1)) / slots;
+    const inset = width * 0.12;
+    const slotX1 = x + inset;
+    const slotX2 = x + width - inset;
+    const slotsSvg: string[] = [];
+    for (let i = 0; i < slots; i += 1) {
+      const sy = y + slotPad + i * (slotH + slotPad);
+      slotsSvg.push(
+        `<rect x="${round(slotX1)}" y="${round(sy)}" width="${round(slotX2 - slotX1)}" height="${round(slotH)}" fill="none" stroke="${stroke}" stroke-width="${sw * 0.7}"/>`,
+        `<circle cx="${round(slotX2 - slotPad)}" cy="${round(sy + slotH / 2)}" r="${round(Math.min(slotH * 0.18, 2))}" fill="${stroke}"/>`
+      );
+    }
+    return [
+      `<rect x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(height)}" rx="${theme.shapes.cornerRadius}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
+      ...slotsSvg
+    ].join("");
+  }
+  if (shape === "client") {
+    const screenInset = width * 0.18;
+    const screenH = height * 0.7;
+    const baseY = y + screenH;
+    const baseHalfW = width * 0.5;
+    const cx = x + width / 2;
+    return [
+      `<rect x="${round(x + screenInset)}" y="${round(y)}" width="${round(width - 2 * screenInset)}" height="${round(screenH)}" rx="${theme.shapes.cornerRadius * 0.5}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
+      `<rect x="${round(x + screenInset + width * 0.04)}" y="${round(y + height * 0.08)}" width="${round(width - 2 * screenInset - width * 0.08)}" height="${round(screenH - height * 0.18)}" fill="none" stroke="${stroke}" stroke-width="${sw * 0.5}"/>`,
+      `<polygon points="${round(cx - baseHalfW)},${round(y + height)} ${round(cx + baseHalfW)},${round(y + height)} ${round(cx + baseHalfW * 0.7)},${round(baseY)} ${round(cx - baseHalfW * 0.7)},${round(baseY)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`
+    ].join("");
+  }
+  if (shape === "loadbalancer") {
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    const inset = width * 0.18;
+    const verticalInset = height * 0.15;
+    const points = [
+      `${round(x + inset)},${round(y + verticalInset)}`,
+      `${round(x + width - inset)},${round(y + verticalInset)}`,
+      `${round(x + width)},${round(cy)}`,
+      `${round(x + width - inset)},${round(y + height - verticalInset)}`,
+      `${round(x + inset)},${round(y + height - verticalInset)}`,
+      `${round(x)},${round(cy)}`
+    ].join(" ");
+    return [
+      `<polygon points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`,
+      `<line x1="${round(x + inset)}" y1="${round(cy)}" x2="${round(x + width - inset)}" y2="${round(cy)}" stroke="${stroke}" stroke-width="${sw * 0.6}"/>`,
+      `<polygon points="${round(cx)},${round(cy - height * 0.18)} ${round(cx - width * 0.06)},${round(cy)} ${round(cx + width * 0.06)},${round(cy)}" fill="${stroke}"/>`,
+      `<polygon points="${round(cx)},${round(cy + height * 0.18)} ${round(cx - width * 0.06)},${round(cy)} ${round(cx + width * 0.06)},${round(cy)}" fill="${stroke}"/>`
+    ].join("");
+  }
   const tab =
     shape === "component"
       ? `<rect x="${round(x + 0.071 * width)}" y="${round(y + 0.208 * height)}" width="${round(0.107 * width)}" height="${round(0.167 * height)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/><rect x="${round(x + 0.071 * width)}" y="${round(y + 0.583 * height)}" width="${round(0.107 * width)}" height="${round(0.167 * height)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`

@@ -33,7 +33,13 @@ const knownShapes = new Set<NodeShape>([
   "roundedbox",
   "circle",
   "ellipse",
-  "diamond"
+  "diamond",
+  "router",
+  "switch",
+  "firewall",
+  "server",
+  "client",
+  "loadbalancer"
 ]);
 const defaultDirectives = new Set([
   "default_node_color",
@@ -413,7 +419,6 @@ function applyNodeAttributes(
 function normalizeShape(value: string, state: State, loc: SourceRange): NodeShape {
   const normalized = value.toLowerCase();
   const aliases: Record<string, NodeShape> = {
-    server: "rectangle",
     box: "rectangle",
     rect: "rectangle",
     db: "database",
@@ -422,7 +427,17 @@ function normalizeShape(value: string, state: State, loc: SourceRange): NodeShap
     rounded: "roundedbox",
     rhombus: "diamond",
     oval: "ellipse",
-    sticky: "note"
+    sticky: "note",
+    rack: "server",
+    serverrack: "server",
+    workstation: "client",
+    desktop: "client",
+    laptop: "client",
+    pc: "client",
+    lb: "loadbalancer",
+    balancer: "loadbalancer",
+    fw: "firewall",
+    wall: "firewall"
   };
   const shape = aliases[normalized] ?? normalized;
   if (knownShapes.has(shape as NodeShape)) return shape as NodeShape;
