@@ -3,6 +3,7 @@ import type {
   AttributeMap,
   AttributeValue,
   DiagramAst,
+  DiagramDefaults,
   Diagnostic,
   GroupAst,
   NetworkAst,
@@ -22,6 +23,18 @@ import { diagnostic, uniqueId } from "./utils";
 
 const knownProperties = new Set(["address", "color", "width", "description", "shape"]);
 const knownShapes = new Set<NodeShape>(["rectangle", "database", "cloud", "actor", "component", "queue"]);
+const defaultDirectives = new Set([
+  "default_node_color",
+  "default_group_color",
+  "default_network_color",
+  "default_textcolor",
+  "default_linecolor",
+  "default_fontsize",
+  "node_width",
+  "node_height",
+  "span_width",
+  "span_height"
+]);
 
 interface Context {
   network?: ResolvedNetwork;
@@ -33,6 +46,7 @@ interface State {
   nodes: Map<string, ResolvedNode>;
   groups: ResolvedGroup[];
   peerLinks: ResolvedPeerLink[];
+  defaults: DiagramDefaults;
   diagnostics: Diagnostic[];
   usedNetworkIds: Set<string>;
   usedGroupIds: Set<string>;
@@ -45,6 +59,7 @@ export function resolve(ast: DiagramAst, _options: ResolveOptions = {}): Resolve
     nodes: new Map(),
     groups: [],
     peerLinks: [],
+    defaults: {},
     diagnostics: [],
     usedNetworkIds: new Set(),
     usedGroupIds: new Set(),
@@ -98,6 +113,7 @@ export function resolve(ast: DiagramAst, _options: ResolveOptions = {}): Resolve
     nodes: [...state.nodes.values()].sort((a, b) => a.order - b.order),
     groups: state.groups,
     peerLinks: state.peerLinks,
+    defaults: state.defaults,
     diagnostics: state.diagnostics
   };
 
@@ -184,7 +200,8 @@ function visitNode(statement: NodeAst, state: State, context: Context): void {
 
   if (context.network) {
     const existing = node.attachments.find((attachment) => attachment.networkId === context.network?.id);
-    const address = stringify(statement.attributes.address);
+    const rawAddress = stringify(statement.attributes.address);
+    const address = rawAddress ? expandAddress(rawAddress, context.network.address) : "";
     if (existing) {
       if (address) existing.address = address;
       if (!context.group) {
@@ -240,6 +257,12 @@ function applyProperty(
   context: Context
 ): void {
   const key = name.toLowerCase();
+
+  if (!context.network && !context.group && defaultDirectives.has(key)) {
+    applyDefault(state.defaults, key, value);
+    return;
+  }
+
   if (!knownProperties.has(key)) {
     state.diagnostics.push(diagnostic("warning", "resolve.unknownProperty", `Unknown property "${name}".`, loc));
     return;
@@ -257,6 +280,44 @@ function applyProperty(
   state.diagnostics.push(
     diagnostic("warning", "resolve.topLevelProperty", `Top-level property "${name}" is ignored.`, loc)
   );
+}
+
+function applyDefault(defaults: DiagramDefaults, key: string, value: AttributeValue): void {
+  const text = stringify(value);
+  const num = typeof value === "number" ? value : Number(text);
+  const finiteNum = Number.isFinite(num) ? num : undefined;
+  switch (key) {
+    case "default_node_color":
+      defaults.nodeColor = text;
+      break;
+    case "default_group_color":
+      defaults.groupColor = text;
+      break;
+    case "default_network_color":
+      defaults.networkColor = text;
+      break;
+    case "default_textcolor":
+      defaults.textColor = text;
+      break;
+    case "default_linecolor":
+      defaults.lineColor = text;
+      break;
+    case "default_fontsize":
+      if (finiteNum !== undefined && finiteNum > 0) defaults.fontSize = finiteNum;
+      break;
+    case "node_width":
+      if (finiteNum !== undefined && finiteNum > 0) defaults.nodeWidth = finiteNum;
+      break;
+    case "node_height":
+      if (finiteNum !== undefined && finiteNum > 0) defaults.nodeHeight = finiteNum;
+      break;
+    case "span_width":
+      if (finiteNum !== undefined && finiteNum > 0) defaults.spanWidth = finiteNum;
+      break;
+    case "span_height":
+      if (finiteNum !== undefined && finiteNum > 0) defaults.spanHeight = finiteNum;
+      break;
+  }
 }
 
 function applyNetworkProperty(network: ResolvedNetwork, key: string, value: AttributeValue): void {
@@ -344,6 +405,24 @@ function validateAddresses(state: State): void {
       }
     }
   }
+}
+
+function expandAddress(address: string, networkCidr: string | undefined): string {
+  if (!address.startsWith(".")) return address;
+  if (!networkCidr) return address;
+  const cidrMatch = /^(\d{1,3}(?:\.\d{1,3}){3})\/(\d|[12]\d|3[0-2])$/.exec(networkCidr);
+  if (!cidrMatch) return address;
+  const baseParts = (cidrMatch[1] ?? "").split(".");
+  const suffixParts = address.slice(1).split(".");
+  if (suffixParts.length === 0 || suffixParts.length > 4) return address;
+  if (suffixParts.some((p) => !/^\d{1,3}$/.test(p))) return address;
+  const merged = [...baseParts];
+  for (let i = 0; i < suffixParts.length; i += 1) {
+    const value = suffixParts[i];
+    if (value === undefined) continue;
+    merged[4 - suffixParts.length + i] = value;
+  }
+  return merged.join(".");
 }
 
 function isAddressInCidr(address: string, cidr: string): boolean {

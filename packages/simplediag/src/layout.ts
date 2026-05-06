@@ -23,9 +23,22 @@ interface InternalPlacedNode extends PlacedNode {
 }
 
 export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): LayoutResult {
-  const spacing = { ...defaultTheme.spacing, ...options.spacing };
-  const shape = defaultTheme.shapes;
-  const typography = defaultTheme.typography;
+  const defaults = diagram.defaults ?? {};
+  const spacing = {
+    ...defaultTheme.spacing,
+    ...(defaults.spanWidth !== undefined ? { columnGap: defaults.spanWidth } : {}),
+    ...(defaults.spanHeight !== undefined ? { railGap: defaults.spanHeight } : {}),
+    ...options.spacing
+  };
+  const shape = {
+    ...defaultTheme.shapes,
+    ...(defaults.nodeWidth !== undefined ? { nodeWidth: defaults.nodeWidth } : {}),
+    ...(defaults.nodeHeight !== undefined ? { nodeHeight: defaults.nodeHeight } : {})
+  };
+  const typography = {
+    ...defaultTheme.typography,
+    ...(defaults.fontSize !== undefined ? { fontSize: defaults.fontSize } : {})
+  };
   const diagnostics: Diagnostic[] = [];
   const labelWidth = Math.max(
     80,
@@ -81,7 +94,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
   );
   const railStart = spacing.margin + labelWidth + spacing.labelGap;
   const rails = diagram.networks.map((network) =>
-    placeRail(network, placedNodes, railStart, maxRight, spacing.margin, spacing.railGap)
+    placeRail(network, placedNodes, railStart, maxRight, spacing.margin, spacing.railGap, shape)
   );
 
   const labels = placeLabels(diagram, rails, placedNodes, spacing, typography);
@@ -157,7 +170,8 @@ function placeRail(
   railStart: number,
   maxRight: number,
   margin: number,
-  railGap: number
+  railGap: number,
+  shape: typeof defaultTheme.shapes
 ): PlacedRail {
   const linked = nodes.filter(
     (node) => node.minNetworkOrder <= network.order && node.maxNetworkOrder >= network.order
@@ -169,8 +183,8 @@ function placeRail(
     networkId: network.id,
     x,
     y: margin + network.order * railGap,
-    width: Math.max(defaultTheme.shapes.minRailWidth, right - x),
-    height: defaultTheme.shapes.railHeight,
+    width: Math.max(shape.minRailWidth, right - x),
+    height: shape.railHeight,
     label: network.description ?? network.name,
     address: network.address,
     color: network.color,

@@ -4,6 +4,7 @@ export type {
   AttributeValue,
   BBox,
   DiagramAst,
+  DiagramDefaults,
   Diagnostic,
   DiagnosticSeverity,
   DiagramType,

@@ -1,6 +1,7 @@
 import { mergeTheme } from "./theme";
 import type {
   Diagnostic,
+  DiagramDefaults,
   LayoutResult,
   NodeShape,
   PlacedNode,
@@ -10,13 +11,32 @@ import type {
 } from "./types";
 import { escapeXml, hasErrors, sanitizeId } from "./utils";
 
+function applyDefaults(theme: SimplediagTheme, defaults: DiagramDefaults | undefined): SimplediagTheme {
+  if (!defaults) return theme;
+  return {
+    ...theme,
+    colors: {
+      ...theme.colors,
+      ...(defaults.nodeColor !== undefined ? { nodeFill: defaults.nodeColor } : {}),
+      ...(defaults.groupColor !== undefined ? { groupFill: defaults.groupColor } : {}),
+      ...(defaults.networkColor !== undefined ? { railFill: defaults.networkColor } : {}),
+      ...(defaults.textColor !== undefined ? { text: defaults.textColor } : {}),
+      ...(defaults.lineColor !== undefined ? { linkStroke: defaults.lineColor } : {})
+    },
+    typography: {
+      ...theme.typography,
+      ...(defaults.fontSize !== undefined ? { fontSize: defaults.fontSize } : {})
+    }
+  };
+}
+
 export function render(layoutResult: LayoutResult, options: RenderOptions = {}): RenderResult {
   const diagnostics = layoutResult.diagnostics;
   if (hasErrors(diagnostics)) {
     return renderDiagnostics(diagnostics, options);
   }
 
-  const theme = mergeTheme(options.theme);
+  const theme = applyDefaults(mergeTheme(options.theme), layoutResult.diagram.defaults);
   const id = sanitizeId(options.id ?? "simplediag");
   const width = Math.ceil(layoutResult.bounds.width);
   const height = Math.ceil(layoutResult.bounds.height);

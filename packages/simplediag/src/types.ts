@@ -90,7 +90,21 @@ export interface ResolvedDiagram {
   nodes: ResolvedNode[];
   groups: ResolvedGroup[];
   peerLinks: ResolvedPeerLink[];
+  defaults: DiagramDefaults;
   diagnostics: Diagnostic[];
+}
+
+export interface DiagramDefaults {
+  nodeColor?: string;
+  groupColor?: string;
+  networkColor?: string;
+  textColor?: string;
+  lineColor?: string;
+  fontSize?: number;
+  nodeWidth?: number;
+  nodeHeight?: number;
+  spanWidth?: number;
+  spanHeight?: number;
 }
 
 export interface ResolvedNetwork {
