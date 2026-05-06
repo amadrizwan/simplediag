@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>simplediag demo</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>simplediag</h1>
+      <p>Paste an nwdiag-compatible script and render it to SVG.</p>
+    </header>
+    <main>
+      <section class="editor">
+        <label for="source">Source</label>
+        <textarea id="source" spellcheck="false"></textarea>
+        <div class="actions">
+          <button id="render" type="button">Render</button>
+          <button id="clear" type="button" class="secondary">Clear</button>
+          <label class="switch">
+            <input type="checkbox" id="errorMode" />
+            <span>Show error SVG on failure</span>
+          </label>
+        </div>
+      </section>
+      <section class="output">
+        <div class="tabs">
+          <button class="tab active" data-tab="svg">Diagram</button>
+          <button class="tab" data-tab="diagnostics">Diagnostics <span id="diagCount" class="badge"></span></button>
+          <button class="tab" data-tab="raw">Raw SVG</button>
+        </div>
+        <div class="pane" data-pane="svg" id="svgPane"></div>
+        <pre class="pane hidden" data-pane="diagnostics" id="diagPane"></pre>
+        <pre class="pane hidden" data-pane="raw" id="rawPane"></pre>
+      </section>
+    </main>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
