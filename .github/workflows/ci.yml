@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter simplediag typecheck
+
+      - run: pnpm --filter simplediag check:license
+
+      - run: pnpm --filter simplediag test
+
+      - run: pnpm --filter simplediag build
+
+      - name: Verify pack contents
+        if: matrix.node == '22'
+        run: |
+          cd packages/simplediag
+          pnpm pack --pack-destination /tmp
+          tar -tzf /tmp/simplediag-*.tgz | sort

@@ -1,6 +1,18 @@
 # simplediag
 
-`simplediag` is a small TypeScript package for rendering nwdiag-compatible network diagrams to SVG.
+[![CI](https://github.com/amadrizwan/simplediag/actions/workflows/ci.yml/badge.svg)](https://github.com/amadrizwan/simplediag/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/simplediag.svg)](https://www.npmjs.com/package/simplediag)
+
+`simplediag` is a small TypeScript package for rendering nwdiag-compatible network diagrams to SVG. Browser-native, no Python or Java backend required.
+
+## Install
+
+```bash
+pnpm add simplediag
+# or: npm install simplediag / yarn add simplediag
+```
+
+## Usage
 
 ```ts
 import { renderFromSource } from "simplediag";
