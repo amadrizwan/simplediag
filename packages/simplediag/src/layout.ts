@@ -21,6 +21,7 @@ interface InternalPlacedNode extends PlacedNode {
   centerY: number;
   minNetworkOrder: number;
   maxNetworkOrder: number;
+  attachedNetworkIds: Set<string>;
 }
 
 export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): LayoutResult {
@@ -65,10 +66,18 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
     const x = spacing.margin + labelWidth + spacing.labelGap + column * (shape.nodeWidth + spacing.columnGap);
     const width = shape.nodeWidth * span + spacing.columnGap * (span - 1);
     const height = shape.nodeHeight;
-    const y =
-      item.max === item.min
-        ? railBottomY(item.min) + spacing.labelGap + typography.labelFontSize + 4
-        : (railBottomY(item.min) + railTopY(item.max)) / 2 - height / 2;
+    const labelClearance = spacing.labelGap + typography.labelFontSize + 4;
+    let y: number;
+    if (item.node.placement === "top") {
+      y = railTopY(item.min) - labelClearance - height;
+    } else if (item.node.placement === "bottom") {
+      y = railBottomY(item.max) + labelClearance;
+    } else {
+      y =
+        item.max === item.min
+          ? railBottomY(item.min) + labelClearance
+          : (railBottomY(item.min) + railTopY(item.max)) / 2 - height / 2;
+    }
     placedNodes.push({
       id: `node-${item.node.id}`,
       nodeId: item.node.id,
@@ -84,11 +93,13 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
       color: item.node.color,
       textColor: item.node.textColor,
       numbered: item.node.numbered,
+      placement: item.node.placement,
       stacked: item.node.stacked,
       centerX: x + width / 2,
       centerY: y + height / 2,
       minNetworkOrder: item.min,
-      maxNetworkOrder: item.max
+      maxNetworkOrder: item.max,
+      attachedNetworkIds: new Set(item.node.attachments.map((a) => a.networkId))
     });
   }
 
@@ -97,9 +108,12 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
     ...placedNodes.map((node) => node.x + node.width)
   );
   const railStart = spacing.margin + labelWidth + spacing.labelGap;
-  const rails = diagram.networks.map((network) =>
-    placeRail(network, placedNodes, railStart, maxRight, spacing.margin, spacing.railGap, shape)
-  );
+  const seenRows = new Set<string>();
+  const rails = diagram.networks.map((network) => {
+    const showLabel = !seenRows.has(network.rowId);
+    seenRows.add(network.rowId);
+    return placeRail(network, placedNodes, railStart, maxRight, spacing.margin, spacing.railGap, shape, showLabel);
+  });
 
   const labels = placeLabels(diagram, rails, placedNodes, spacing, typography);
   const groups = placeGroups(diagram, placedNodes, spacing, rails);
@@ -127,7 +141,7 @@ function nodeInterval(
   networkById: Map<string, ResolvedNetwork>
 ): { node: ResolvedNode; min: number; max: number } {
   const orders = node.attachments
-    .map((attachment) => networkById.get(attachment.networkId)?.order)
+    .map((attachment) => networkById.get(attachment.networkId)?.rowOrder)
     .filter((value): value is number => value !== undefined);
   if (orders.length === 0) return { node, min: 0, max: 0 };
   const min = Math.min(...orders);
@@ -177,23 +191,25 @@ function placeRail(
   maxRight: number,
   margin: number,
   railGap: number,
-  shape: typeof defaultTheme.shapes
+  shape: typeof defaultTheme.shapes,
+  showLabel: boolean
 ): PlacedRail {
-  const linked = nodes.filter(
-    (node) => node.minNetworkOrder <= network.order && node.maxNetworkOrder >= network.order
-  );
+  const linked = nodes.filter((node) => node.attachedNetworkIds.has(network.id));
   const x = network.fullWidth || linked.length === 0 ? railStart : Math.min(...linked.map((node) => node.centerX));
   const right = network.fullWidth || linked.length === 0 ? maxRight : Math.max(...linked.map((node) => node.centerX));
   return {
     id: `rail-${network.id}`,
     networkId: network.id,
+    rowId: network.rowId,
     x,
-    y: margin + network.order * railGap,
+    y: margin + network.rowOrder * railGap,
     width: Math.max(shape.minRailWidth, right - x),
     height: shape.railHeight,
-    label: network.description ?? network.name,
+    label: network.rowName ?? network.description ?? network.name,
     address: network.address,
     color: network.color,
+    style: network.style,
+    showLabel,
     fullWidth: network.fullWidth
   };
 }
@@ -207,6 +223,7 @@ function placeLabels(
 ): PlacedLabel[] {
   const labels: PlacedLabel[] = [];
   for (const rail of rails) {
+    if (!rail.showLabel) continue;
     const network = diagram.networks.find((item) => item.id === rail.networkId);
     if (!network?.visible) continue;
     labels.push({
@@ -251,11 +268,16 @@ function placeGroups(
     const memberMinY = Math.min(...members.map((node) => node.y));
     const labelClearance = defaultTheme.typography.labelFontSize + 6;
     const railsAbove = rails.filter((rail) => rail.y + rail.height <= memberMinY);
-    const minY = railsAbove.length > 0
-      ? Math.max(...railsAbove.map((rail) => rail.y + rail.height)) + labelClearance
-      : labelClearance;
     const x1 = Math.min(...members.map((node) => node.x)) - spacing.groupPadding;
-    const y1 = Math.max(memberMinY - spacing.groupPadding, minY);
+    let y1: number;
+    if (group.style === "label-only") {
+      y1 = memberMinY - spacing.groupPadding;
+    } else {
+      const minY = railsAbove.length > 0
+        ? Math.max(...railsAbove.map((rail) => rail.y + rail.height)) + labelClearance
+        : labelClearance;
+      y1 = Math.max(memberMinY - spacing.groupPadding, minY);
+    }
     const x2 = Math.max(...members.map((node) => node.x + node.width)) + spacing.groupPadding;
     const y2 = Math.max(...members.map((node) => node.y + node.height)) + spacing.groupPadding;
     return [
@@ -267,7 +289,8 @@ function placeGroups(
         y: y1,
         width: x2 - x1,
         height: y2 - y1,
-        color: group.color
+        color: group.color,
+        style: group.style
       }
     ];
   });
@@ -287,8 +310,12 @@ function placeDropLines(
     for (const attachment of node.attachments) {
       const rail = railByNetwork.get(attachment.networkId);
       if (!rail) continue;
-      const railY = rail.y + rail.height;
-      const nodeY = placed.centerY < railY ? placed.y + placed.height : placed.y;
+      const railTop = rail.y;
+      const railBottom = rail.y + rail.height;
+      const nodeIsAbove = placed.y + placed.height <= railTop;
+      const nodeIsBelow = placed.y >= railBottom;
+      const railY = nodeIsAbove ? railTop : nodeIsBelow ? railBottom : railBottom;
+      const nodeY = nodeIsAbove ? placed.y + placed.height : nodeIsBelow ? placed.y : placed.y;
       out.push({
         id: `drop-${node.id}-${attachment.networkId}`,
         nodeId: node.id,

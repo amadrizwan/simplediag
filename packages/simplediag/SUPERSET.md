@@ -199,7 +199,71 @@ Renders a small badge in the top-right corner of the node containing the
 number. `true` opts into a global counter; an integer pins the specific
 number.
 
-### 17. `route` syntax for explicit waypoints
+### 17. Per-node `placement` (top / bottom / between)
+
+Controls where a multi-homed node sits relative to its attached rails.
+
+```nwdiag
+smsc01 [shape = server, placement = top];     # above the topmost attached rail
+db01   [shape = database];                    # default `between` — centered
+insv01 [shape = server, placement = bottom];  # below the bottommost attached rail
+```
+
+`top` and `bottom` are essential for "north/south shore" diagrams (servers
+above all rails connecting down through attachment points; storage hosts
+below all rails connecting up). nwdiag only supports the `between`
+arrangement.
+
+Drop-lines now attach to the rail edge nearest the node (top or bottom),
+not always the bottom — so lines no longer overshoot through the rail
+when a node sits above it.
+
+### 18. Per-network `style` (rail line style)
+
+```nwdiag
+network others { style = dashed; ... }
+```
+
+Networks default to a solid pill-shaped rail. With `style = dashed` or
+`style = dotted`, the rail renders as a horizontal stroke-dasharray line
+instead. Useful for indicating logical/virtual links versus physical
+segments (the upstream nwdiag SMSC reference diagram uses a dashed
+`Others` line for shared infrastructure).
+
+### 19. Networks per `row` (multiple rails on one Y-level)
+
+```nwdiag
+network o_and_m_1 { row = "O&M"; ... }
+network o_and_m_2 { row = "O&M"; ... }
+network internal_1 { row = "Internal"; ... }
+network internal_2 { row = "Internal"; ... }
+```
+
+Multiple networks declaring the same `row` value share a Y-level. Each
+remains a logically separate rail with its own X-range. The row label
+("O&M" / "Internal") renders once for the row, taken from the `row`
+attribute as written (preserving capitalization and special characters
+through `rowName`). nwdiag treats networks-by-name as the single merged
+rail; this is required for any topology where multiple isolated network
+segments share visual alignment, like an enterprise diagram with several
+O&M VLANs at the same logical level.
+
+### 20. Group `style = label-only`
+
+```nwdiag
+group smsc_title {
+  description = "SMSC MMSC";
+  style = label-only;
+  smsc_a; smsc_b;
+}
+```
+
+Skips the group rectangle and only renders the label, positioned above
+the topmost member node. Useful for floating section titles or labeled
+brackets over a column range without enclosing the nodes in a box. The
+default `style = filled` is the existing behaviour (rectangle + label).
+
+### 21. `route` syntax for explicit waypoints
 
 ```nwdiag
 route web -> firewall -> db [label = "request path", color = "blue"];
@@ -213,7 +277,7 @@ peer-link lanes so they don't visually mix. Routes accept `label`, `color`,
 `style` like peer-link attributes; default style is `solid` (versus
 `dashed` for peer links) so the difference reads at a glance.
 
-### 18. Build & distribution
+### 22. Build & distribution
 
 - ESM + CJS + `.d.ts` outputs (no Node-only APIs in `src/`)
 - Zero runtime dependencies
@@ -240,6 +304,13 @@ where possible (additive syntax, no breaking changes to existing scripts).
 - **Smarter route label placement** — currently uses centroid of the
   polyline points, which can clip near intermediate spurs. Should pin
   to the longest horizontal segment.
+- **Junction markers at attachment points** — small filled circle where
+  drop-lines meet rails, for visual clarity when a long drop-line
+  passes through several rails at marked attachment points (the
+  upstream SMSC reference diagram convention).
+- **Trunk / aggregate "switch on rail" sugar** — declare a node that
+  *is* the switch sitting on a rail row, rather than the
+  `multi-homed-with-shape=switch` pattern.
 
 ### Shape additions
 

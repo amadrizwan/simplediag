@@ -1,0 +1,49 @@
+nwdiag {
+  span_height = 110;
+
+  network o_and_m_1 {
+    row = "O&M";
+    smsc01a [shape = server, placement = top];
+    smsc02a [shape = server, placement = top];
+    sw1 [shape = switch];
+  }
+  network internal_1 {
+    row = "Internal";
+    smsc01a;
+    smsc02a;
+    sw1;
+  }
+  network others {
+    row = "Others";
+    style = dashed;
+    smsc01a;
+    smsc02a;
+  }
+  network o_and_m_2 {
+    row = "O&M";
+    smsc01b [shape = server, placement = top];
+    sw2 [shape = switch];
+  }
+  network internal_2 {
+    row = "Internal";
+    smsc01b;
+    sw2;
+  }
+  network internal_insights {
+    row = "Internal (Insights)";
+    insv1 [shape = server, placement = bottom];
+    insv2 [shape = server, placement = bottom];
+  }
+
+  group title {
+    description = "SMSC MMSC";
+    style = label-only;
+    smsc01a;
+    smsc02a;
+  }
+  group hosts {
+    description = "Insights Hosts";
+    insv1;
+    insv2;
+  }
+}

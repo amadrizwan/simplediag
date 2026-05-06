@@ -317,6 +317,91 @@ nwdiag {
     expect(errors).toHaveLength(1);
   });
 
+  it("merges networks sharing a row onto the same Y", () => {
+    const parsed = parse(`
+nwdiag {
+  network a { row = "top"; n1; }
+  network b { row = "top"; n2; }
+  network c { row = "bot"; n3; }
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const placed = layout(resolved.diagram!);
+    const railA = placed.rails.find((r) => r.networkId === "a");
+    const railB = placed.rails.find((r) => r.networkId === "b");
+    const railC = placed.rails.find((r) => r.networkId === "c");
+    expect(railA?.y).toBe(railB?.y);
+    expect(railA?.y).not.toBe(railC?.y);
+    expect(railA?.showLabel).toBe(true);
+    expect(railB?.showLabel).toBe(false);
+  });
+
+  it("places nodes above rails with placement = top", () => {
+    const parsed = parse(`
+nwdiag {
+  network n1 { web; }
+  network n2 { web; }
+  network n3 { web; }
+}
+`);
+    const resolvedDefault = resolve(parsed.ast!);
+    const placedDefault = layout(resolvedDefault.diagram!);
+    const yBetween = placedDefault.nodes.find((n) => n.nodeId === "web")?.y;
+
+    const parsedTop = parse(`
+nwdiag {
+  network n1 { web [placement = top]; }
+  network n2 { web; }
+  network n3 { web; }
+}
+`);
+    const resolvedTop = resolve(parsedTop.ast!);
+    const placedTop = layout(resolvedTop.diagram!);
+    const yTop = placedTop.nodes.find((n) => n.nodeId === "web")?.y;
+
+    expect(yTop).toBeDefined();
+    expect(yBetween).toBeDefined();
+    expect(yTop! < yBetween!).toBe(true);
+  });
+
+  it("renders a dashed network rail as a stroke-dasharray line", () => {
+    const result = renderFromSource(`
+nwdiag {
+  network n {
+    style = dashed;
+    a;
+  }
+}
+`);
+    expect(result.svg).toContain("stroke-dasharray");
+    expect(result.svg).not.toMatch(/<rect[^>]+fill="#dcecf7"/);
+  });
+
+  it("group with style label-only skips the rectangle", () => {
+    const result = renderFromSource(`
+nwdiag {
+  network n { a; b; }
+  group title {
+    description = "Title";
+    style = label-only;
+    a; b;
+  }
+}
+`);
+    const text = result.svg ?? "";
+    expect(text).toContain(">Title</text>");
+    const rectCount = (text.match(/<rect /g) ?? []).length;
+    const noLabelOnly = renderFromSource(`
+nwdiag {
+  network n { a; b; }
+  group title { description = "Title"; a; b; }
+}
+`);
+    const noLabelText = noLabelOnly.svg ?? "";
+    const noLabelRectCount = (noLabelText.match(/<rect /g) ?? []).length;
+    expect(rectCount).toBeLessThan(noLabelRectCount);
+  });
+
   it("throws when errorMode is throw", () => {
     expect(() =>
       renderFromSource(

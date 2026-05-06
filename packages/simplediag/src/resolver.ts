@@ -16,6 +16,7 @@ import type {
   ResolvedNode,
   ResolvedPeerLink,
   ResolvedRoute,
+  GroupStyle,
   ResolveOptions,
   ResolveResult,
   SourceRange
@@ -30,7 +31,10 @@ const knownProperties = new Set([
   "description",
   "shape",
   "stacked",
-  "numbered"
+  "numbered",
+  "placement",
+  "row",
+  "style"
 ]);
 const knownShapes = new Set<NodeShape>([
   "rectangle",
@@ -109,9 +113,19 @@ export function resolve(ast: DiagramAst, _options: ResolveOptions = {}): Resolve
       id: "network-1",
       name: "",
       order: 0,
+      rowId: "network-1",
+      rowOrder: 0,
       visible: false,
       fullWidth: true
     });
+  }
+
+  const rowOrderMap = new Map<string, number>();
+  for (const network of state.networks) {
+    if (!rowOrderMap.has(network.rowId)) {
+      rowOrderMap.set(network.rowId, rowOrderMap.size);
+    }
+    network.rowOrder = rowOrderMap.get(network.rowId)!;
   }
 
   const defaultNetwork = state.networks[0];
@@ -205,10 +219,13 @@ function visitNetwork(statement: NetworkAst, state: State, context: Context): vo
 
   const order = state.networks.length;
   const baseId = slug(statement.name || `network-${order + 1}`);
+  const id = uniqueId(baseId, state.usedNetworkIds);
   const network: ResolvedNetwork = {
-    id: uniqueId(baseId, state.usedNetworkIds),
+    id,
     name: statement.name,
     order,
+    rowId: id,
+    rowOrder: 0,
     visible: statement.name.length > 0,
     fullWidth: false,
     loc: statement.loc
@@ -232,6 +249,7 @@ function visitGroup(statement: GroupAst, state: State, context: Context): void {
     name: statement.name,
     order,
     nodeIds: [],
+    style: "filled",
     loc: statement.loc
   };
   state.groups.push(group);
@@ -280,6 +298,7 @@ function ensureNode(id: string, state: State, loc?: SourceRange): ResolvedNode {
     order: state.nodes.size,
     shape: "rectangle",
     width: 1,
+    placement: "between",
     stacked: false,
     attachments: [],
     loc
@@ -380,12 +399,31 @@ function applyNetworkProperty(network: ResolvedNetwork, key: string, value: Attr
   if (key === "color") network.color = text;
   if (key === "description") network.description = text;
   if (key === "width") network.fullWidth = text.toLowerCase() === "full";
+  if (key === "row") {
+    const slugged = slug(text);
+    if (slugged) {
+      network.rowId = slugged;
+      network.rowName = text;
+    }
+  }
+  if (key === "style") {
+    const style = text.toLowerCase();
+    if (style === "solid" || style === "dashed" || style === "dotted") {
+      network.style = style;
+    }
+  }
 }
 
 function applyGroupProperty(group: ResolvedGroup, key: string, value: AttributeValue): void {
   const text = stringify(value);
   if (key === "color") group.color = text;
   if (key === "description") group.description = text;
+  if (key === "style") {
+    const style = text.toLowerCase();
+    if (style === "filled" || style === "label-only" || style === "labelonly") {
+      group.style = style === "labelonly" ? "label-only" : (style as GroupStyle);
+    }
+  }
 }
 
 const knownLinkAttrs = new Set(["label", "color", "style"]);
@@ -474,6 +512,16 @@ function applyNodeAttributes(
     }
     if (key === "stacked") {
       node.stacked = typeof value === "boolean" ? value : text.toLowerCase() !== "false";
+    }
+    if (key === "placement") {
+      const pl = text.toLowerCase();
+      if (pl === "top" || pl === "bottom" || pl === "between") {
+        node.placement = pl;
+      } else {
+        state.diagnostics.push(
+          diagnostic("warning", "resolve.unknownPlacement", `Unknown placement "${text}", using between.`, loc)
+        );
+      }
     }
     if (key === "textcolor") node.textColor = text;
     if (key === "numbered") {

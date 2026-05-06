@@ -54,9 +54,11 @@ export function render(layoutResult: LayoutResult, options: RenderOptions = {}):
   );
 
   for (const group of layoutResult.groups) {
-    parts.push(
-      `<rect x="${round(group.x)}" y="${round(group.y)}" width="${round(group.width)}" height="${round(group.height)}" rx="${theme.shapes.cornerRadius}" fill="${escapeXml(group.color ?? theme.colors.groupFill)}" stroke="${escapeXml(theme.colors.groupStroke)}" stroke-width="${theme.strokes.groupWidth}"/>`
-    );
+    if (group.style !== "label-only") {
+      parts.push(
+        `<rect x="${round(group.x)}" y="${round(group.y)}" width="${round(group.width)}" height="${round(group.height)}" rx="${theme.shapes.cornerRadius}" fill="${escapeXml(group.color ?? theme.colors.groupFill)}" stroke="${escapeXml(theme.colors.groupStroke)}" stroke-width="${theme.strokes.groupWidth}"/>`
+      );
+    }
     if (group.label) {
       parts.push(
         `<text x="${round(group.x + theme.spacing.groupPadding)}" y="${round(group.y - 4)}" font-size="${theme.typography.labelFontSize}" fill="${escapeXml(theme.colors.mutedText)}">${escapeXml(group.label)}</text>`
@@ -65,9 +67,17 @@ export function render(layoutResult: LayoutResult, options: RenderOptions = {}):
   }
 
   for (const rail of layoutResult.rails) {
-    parts.push(
-      `<rect x="${round(rail.x)}" y="${round(rail.y)}" width="${round(rail.width)}" height="${round(rail.height)}" rx="${round(rail.height / 2)}" fill="${escapeXml(rail.color ?? theme.colors.railFill)}" stroke="${escapeXml(theme.colors.railStroke)}" stroke-width="${theme.strokes.railWidth}"/>`
-    );
+    if (rail.style && rail.style !== "solid") {
+      const dash = rail.style === "dotted" ? '1 4' : '6 4';
+      const lineY = round(rail.y + rail.height / 2);
+      parts.push(
+        `<line x1="${round(rail.x)}" y1="${lineY}" x2="${round(rail.x + rail.width)}" y2="${lineY}" stroke="${escapeXml(rail.color ?? theme.colors.railStroke)}" stroke-width="${theme.strokes.railWidth}" stroke-dasharray="${dash}"/>`
+      );
+    } else {
+      parts.push(
+        `<rect x="${round(rail.x)}" y="${round(rail.y)}" width="${round(rail.width)}" height="${round(rail.height)}" rx="${round(rail.height / 2)}" fill="${escapeXml(rail.color ?? theme.colors.railFill)}" stroke="${escapeXml(theme.colors.railStroke)}" stroke-width="${theme.strokes.railWidth}"/>`
+      );
+    }
   }
 
   for (const link of layoutResult.peerLinks) {

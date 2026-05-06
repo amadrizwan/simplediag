@@ -142,13 +142,19 @@ export interface ResolvedNetwork {
   id: string;
   name: string;
   order: number;
+  rowId: string;
+  rowName?: string;
+  rowOrder: number;
   visible: boolean;
   address?: string;
   description?: string;
   color?: string;
+  style?: LinkStyle;
   fullWidth: boolean;
   loc?: SourceRange;
 }
+
+export type NodePlacement = "top" | "bottom" | "between";
 
 export interface ResolvedNode {
   id: string;
@@ -158,6 +164,7 @@ export interface ResolvedNode {
   color?: string;
   textColor?: string;
   numbered?: number;
+  placement: NodePlacement;
   shape: NodeShape;
   width: number;
   stacked: boolean;
@@ -192,6 +199,8 @@ export interface ResolvedAttachment {
   loc?: SourceRange;
 }
 
+export type GroupStyle = "filled" | "label-only";
+
 export interface ResolvedGroup {
   id: string;
   name: string;
@@ -199,6 +208,7 @@ export interface ResolvedGroup {
   nodeIds: string[];
   description?: string;
   color?: string;
+  style: GroupStyle;
   loc?: SourceRange;
 }
 
@@ -236,6 +246,7 @@ export interface Point {
 export interface PlacedRail {
   id: string;
   networkId: string;
+  rowId: string;
   x: number;
   y: number;
   width: number;
@@ -243,6 +254,8 @@ export interface PlacedRail {
   label: string;
   address?: string;
   color?: string;
+  style?: LinkStyle;
+  showLabel: boolean;
   fullWidth: boolean;
 }
 
@@ -261,6 +274,7 @@ export interface PlacedNode {
   color?: string;
   textColor?: string;
   numbered?: number;
+  placement: NodePlacement;
   stacked: boolean;
 }
 
@@ -273,6 +287,7 @@ export interface PlacedGroup {
   width: number;
   height: number;
   color?: string;
+  style: GroupStyle;
 }
 
 export interface PlacedDropLine {
