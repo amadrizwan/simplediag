@@ -193,6 +193,46 @@ nwdiag
     expect(network.statements[0]?.kind).toBe("Node");
   });
 
+  it("places single-homed nodes on their rail, not spanning from rail 0", () => {
+    const parsed = parse(`
+nwdiag {
+  network top {
+    web;
+  }
+  network bottom {
+    db;
+  }
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const placed = layout(resolved.diagram!);
+    const web = placed.nodes.find((n) => n.nodeId === "web");
+    const db = placed.nodes.find((n) => n.nodeId === "db");
+    expect(web?.row).toBe(0);
+    expect(db?.row).toBe(1);
+    expect(db?.span).toBe(1);
+    expect(db && web ? db.y > web.y : false).toBe(true);
+  });
+
+  it("does not warn when a node is referenced inside a group within its network", () => {
+    const parsed = parse(`
+nwdiag {
+  network back {
+    db01;
+    db02;
+    group databases {
+      db01;
+      db02;
+    }
+  }
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const dupes = resolved.diagnostics.filter((d) => d.code === "resolve.duplicateAttachment");
+    expect(dupes).toEqual([]);
+    expect(resolved.diagram?.groups[0]?.nodeIds).toEqual(["db01", "db02"]);
+  });
+
   it("scales shape primitives with theme.shapes.nodeWidth/nodeHeight", () => {
     const renderer = createRenderer({
       theme: { shapes: { nodeWidth: 224, nodeHeight: 96 } }

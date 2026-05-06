@@ -187,9 +187,11 @@ function visitNode(statement: NodeAst, state: State, context: Context): void {
     const address = stringify(statement.attributes.address);
     if (existing) {
       if (address) existing.address = address;
-      state.diagnostics.push(
-        diagnostic("warning", "resolve.duplicateAttachment", `Node "${node.id}" is already attached to this network.`, statement.loc)
-      );
+      if (!context.group) {
+        state.diagnostics.push(
+          diagnostic("warning", "resolve.duplicateAttachment", `Node "${node.id}" is already attached to this network.`, statement.loc)
+        );
+      }
     } else {
       node.attachments.push({
         id: `${node.id}@${context.network.id}`,

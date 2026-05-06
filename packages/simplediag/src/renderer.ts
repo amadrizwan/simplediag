@@ -38,7 +38,7 @@ export function render(layoutResult: LayoutResult, options: RenderOptions = {}):
     );
     if (group.label) {
       parts.push(
-        `<text x="${round(group.x + theme.spacing.groupPadding)}" y="${round(group.y + theme.typography.labelFontSize + 3)}" font-size="${theme.typography.labelFontSize}" fill="${escapeXml(theme.colors.mutedText)}">${escapeXml(group.label)}</text>`
+        `<text x="${round(group.x + theme.spacing.groupPadding)}" y="${round(group.y - 4)}" font-size="${theme.typography.labelFontSize}" fill="${escapeXml(theme.colors.mutedText)}">${escapeXml(group.label)}</text>`
       );
     }
   }

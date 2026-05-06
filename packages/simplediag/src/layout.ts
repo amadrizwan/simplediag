@@ -40,18 +40,21 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
   const occupied = new Map<number, Array<[number, number]>>();
   const placedNodes: InternalPlacedNode[] = [];
 
+  const railTopY = (order: number) => spacing.margin + order * spacing.railGap;
+  const railBottomY = (order: number) => railTopY(order) + shape.railHeight;
+
   for (const item of nodeIntervals) {
     const span = Math.max(1, item.node.width);
     const column = firstAvailableColumn(occupied, item.min, item.max, span);
     burnColumns(occupied, item.min, item.max, column, span);
 
     const x = spacing.margin + labelWidth + spacing.labelGap + column * (shape.nodeWidth + spacing.columnGap);
-    const y =
-      spacing.margin +
-      item.min * spacing.railGap +
-      (item.max === item.min ? 20 : ((item.max - item.min) * spacing.railGap) / 2 + 20);
     const width = shape.nodeWidth * span + spacing.columnGap * (span - 1);
     const height = shape.nodeHeight;
+    const y =
+      item.max === item.min
+        ? railBottomY(item.min) + spacing.labelGap + typography.labelFontSize + 4
+        : (railBottomY(item.min) + railTopY(item.max)) / 2 - height / 2;
     placedNodes.push({
       id: `node-${item.node.id}`,
       nodeId: item.node.id,
@@ -82,7 +85,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
   );
 
   const labels = placeLabels(diagram, rails, placedNodes, spacing, typography);
-  const groups = placeGroups(diagram, placedNodes, spacing);
+  const groups = placeGroups(diagram, placedNodes, spacing, rails);
   const dropLines = placeDropLines(diagram, placedNodes, rails);
   const peerLinks = placePeerLinks(diagram, placedNodes);
   const bounds = computeBounds(rails, placedNodes, groups, labels, spacing.margin);
@@ -107,8 +110,9 @@ function nodeInterval(
   const orders = node.attachments
     .map((attachment) => networkById.get(attachment.networkId)?.order)
     .filter((value): value is number => value !== undefined);
-  const min = Math.min(...orders, 0);
-  const max = Math.max(...orders, min);
+  if (orders.length === 0) return { node, min: 0, max: 0 };
+  const min = Math.min(...orders);
+  const max = Math.max(...orders);
   return { node, min, max };
 }
 
@@ -217,14 +221,21 @@ function placeLabels(
 function placeGroups(
   diagram: ResolvedDiagram,
   nodes: InternalPlacedNode[],
-  spacing: typeof defaultTheme.spacing
+  spacing: typeof defaultTheme.spacing,
+  rails: PlacedRail[]
 ): PlacedGroup[] {
   const byId = new Map(nodes.map((node) => [node.nodeId, node]));
   return diagram.groups.flatMap((group) => {
     const members = group.nodeIds.map((id) => byId.get(id)).filter((node): node is InternalPlacedNode => Boolean(node));
     if (members.length === 0) return [];
+    const memberMinY = Math.min(...members.map((node) => node.y));
+    const labelClearance = defaultTheme.typography.labelFontSize + 6;
+    const railsAbove = rails.filter((rail) => rail.y + rail.height <= memberMinY);
+    const minY = railsAbove.length > 0
+      ? Math.max(...railsAbove.map((rail) => rail.y + rail.height)) + labelClearance
+      : labelClearance;
     const x1 = Math.min(...members.map((node) => node.x)) - spacing.groupPadding;
-    const y1 = Math.min(...members.map((node) => node.y)) - spacing.groupPadding - 18;
+    const y1 = Math.max(memberMinY - spacing.groupPadding, minY);
     const x2 = Math.max(...members.map((node) => node.x + node.width)) + spacing.groupPadding;
     const y2 = Math.max(...members.map((node) => node.y + node.height)) + spacing.groupPadding;
     return [

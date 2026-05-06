@@ -25,7 +25,7 @@ export const defaultTheme: SimplediagTheme = {
   },
   spacing: {
     margin: 24,
-    railGap: 96,
+    railGap: 120,
     columnGap: 36,
     nodePaddingX: 14,
     nodePaddingY: 10,
