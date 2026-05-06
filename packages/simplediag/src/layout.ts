@@ -23,6 +23,7 @@ interface InternalPlacedNode extends PlacedNode {
   minNetworkOrder: number;
   maxNetworkOrder: number;
   attachedNetworkIds: Set<string>;
+  trunk: boolean;
 }
 
 export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): LayoutResult {
@@ -102,7 +103,8 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
       centerY: y + height / 2,
       minNetworkOrder: item.min,
       maxNetworkOrder: item.max,
-      attachedNetworkIds: new Set(item.node.attachments.map((a) => a.networkId))
+      attachedNetworkIds: new Set(item.node.attachments.map((a) => a.networkId)),
+      trunk: item.trunk
     });
   }
 
@@ -118,7 +120,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
     return placeRail(network, placedNodes, railStart, maxRight, spacing.margin, spacing.railGap, shape, showLabel);
   });
 
-  const labels = placeLabels(diagram, rails, placedNodes, spacing, typography);
+  const labels = placeLabels(diagram, rails, placedNodes, spacing, typography, railStart);
   const groups = placeGroups(diagram, placedNodes, spacing, rails);
   const dropLines = placeDropLines(diagram, placedNodes, rails);
   const junctions = placeJunctions(diagram, placedNodes, rails);
@@ -130,7 +132,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
     diagram,
     bounds,
     rails,
-    nodes: placedNodes.map(({ centerX: _cx, centerY: _cy, minNetworkOrder: _min, maxNetworkOrder: _max, attachedNetworkIds: _ids, ...node }) => node),
+    nodes: placedNodes.map(({ centerX: _cx, centerY: _cy, minNetworkOrder: _min, maxNetworkOrder: _max, attachedNetworkIds: _ids, trunk: _trunk, ...node }) => node),
     groups,
     dropLines,
     junctions,
@@ -201,8 +203,27 @@ function placeRail(
   showLabel: boolean
 ): PlacedRail {
   const linked = nodes.filter((node) => node.attachedNetworkIds.has(network.id));
-  const x = network.fullWidth || linked.length === 0 ? railStart : Math.min(...linked.map((node) => node.centerX));
-  const right = network.fullWidth || linked.length === 0 ? maxRight : Math.max(...linked.map((node) => node.centerX));
+  let x: number;
+  let right: number;
+  if (network.fullWidth || linked.length === 0) {
+    x = railStart;
+    right = maxRight;
+  } else {
+    const others = linked.filter((node) => !node.trunk);
+    const otherMin = others.length > 0 ? Math.min(...others.map((n) => n.centerX)) : null;
+    const otherMax = others.length > 0 ? Math.max(...others.map((n) => n.centerX)) : null;
+    const points = linked.map((node) => {
+      if (!node.trunk) return { x: node.centerX, fromTrunk: false };
+      if (otherMin === null || otherMax === null) return { x: node.centerX, fromTrunk: true };
+      if (node.centerX < otherMin) return { x: node.x + node.width, fromTrunk: true };
+      if (node.centerX > otherMax) return { x: node.x, fromTrunk: true };
+      return { x: node.centerX, fromTrunk: true };
+    });
+    const leftmost = points.reduce((acc, p) => (p.x < acc.x ? p : acc), points[0]!);
+    const rightmost = points.reduce((acc, p) => (p.x > acc.x ? p : acc), points[0]!);
+    x = leftmost.fromTrunk ? leftmost.x : Math.min(leftmost.x, railStart);
+    right = rightmost.x;
+  }
   return {
     id: `rail-${network.id}`,
     networkId: network.id,
@@ -225,17 +246,21 @@ function placeLabels(
   rails: PlacedRail[],
   nodes: InternalPlacedNode[],
   spacing: typeof defaultTheme.spacing,
-  typography: typeof defaultTheme.typography
+  typography: typeof defaultTheme.typography,
+  railStart: number
 ): PlacedLabel[] {
   const labels: PlacedLabel[] = [];
   for (const rail of rails) {
     if (!rail.showLabel) continue;
     const network = diagram.networks.find((item) => item.id === rail.networkId);
     if (!network?.visible) continue;
+    const text = rail.address ? `${rail.label} ${rail.address}` : rail.label;
+    const labelRight = railStart - spacing.labelGap;
+    const labelX = Math.max(spacing.margin, labelRight - textWidth(text, typography.fontSize));
     labels.push({
       id: `label-${rail.networkId}`,
-      text: rail.address ? `${rail.label} ${rail.address}` : rail.label,
-      x: spacing.margin,
+      text,
+      x: labelX,
       y: rail.y + typography.labelFontSize,
       kind: "network"
     });
@@ -313,6 +338,7 @@ function placeDropLines(
       const attachment = attachments[idx]!;
       const rail = railByNetwork.get(attachment.networkId);
       if (!rail) continue;
+      if (placed.trunk) continue;
       const railTop = rail.y;
       const railBottom = rail.y + rail.height;
       const nodeIsAbove = placed.y + placed.height <= railTop;
@@ -356,6 +382,7 @@ function placeJunctions(
       const attachment = attachments[idx]!;
       const rail = railByNetwork.get(attachment.networkId);
       if (!rail) continue;
+      if (placed.trunk) continue;
       out.push({
         id: `junction-${node.id}-${attachment.networkId}`,
         nodeId: node.id,
