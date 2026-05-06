@@ -1,0 +1,93 @@
+nwdiag {
+  default_connection_style = dashed;
+  span_height = 130;
+  span_width = 30;
+
+  network internet {
+    row = "Internet";
+    address = "203.0.113.0/24";
+    width = full;
+    inet [shape = cloud, placement = top, address = ".1"];
+    fw [address = ".2"];
+  }
+  network dmz {
+    row = "DMZ/NAT";
+    address = "10.0.0.0/24";
+    width = full;
+    fw [shape = firewall, address = ".1"];
+    web1 [shape = rect, placement = top, address = ".10"];
+    web2 [shape = rect, placement = top, address = ".11"];
+  }
+  network o_and_m_1 {
+    row = "O&M";
+    address = "10.1.0.0/24";
+    s1a [shape = rect, placement = top, address = ".10"];
+    s2a [shape = rect, placement = top, address = ".11"];
+    insv1 [shape = rect, placement = bottom, address = ".20"];
+    sw1 [shape = switch];
+  }
+  network o_and_m_2 {
+    row = "O&M";
+    address = "10.1.0.0/24";
+    s1b [shape = rect, placement = top, address = ".12"];
+    s2b [shape = rect, placement = top, address = ".13"];
+    sw1;
+    insv2 [shape = rect, placement = bottom, address = ".21"];
+    sw2 [shape = switch];
+  }
+  network o_and_m_3 {
+    row = "O&M";
+    address = "10.1.0.0/24";
+    s1c [shape = rect, placement = top, address = ".14"];
+    s2c [shape = rect, placement = top, address = ".15"];
+    sw2;
+    insv3 [shape = rect, placement = bottom, address = ".22"];
+  }
+  network internal_1 {
+    row = "Internal";
+    address = "10.2.0.0/24";
+    s1a [address = ".10"];
+    s2a [address = ".11"];
+    isw1 [shape = switch];
+    insv1 [shape = rect, placement = bottom, address = ".20"];
+  }
+  network internal_2 {
+    row = "Internal";
+    address = "10.2.0.0/24";
+    s1b [address = ".12"];
+    s2b [address = ".13"];
+    isw1;
+    isw2 [shape = switch];
+    insv2 [shape = rect, placement = bottom, address = ".21"];
+  }
+  network internal_3 {
+    row = "Internal";
+    address = "10.2.0.0/24";
+    s1c [address = ".14"];
+    s2c [address = ".15"];
+    isw2;
+    insv3 [shape = rect, placement = bottom, address = ".22"];
+  }
+  network others {
+    row = "Others";
+    address = "10.3.0.0/24";
+    style = dashed;
+    width = full;
+    s1a [address = ".10"];
+    s2a [address = ".11"];
+    s1b [address = ".12"];
+    s2b [address = ".13"];
+    s1c [address = ".14"];
+    s2c [address = ".15"];
+  }
+  network storage {
+    row = "Storage";
+    address = "10.4.0.0/24";
+    width = full;
+    insv1 [shape = rect, placement = bottom, address = ".20"];
+    insv2 [shape = rect, placement = bottom, address = ".21"];
+    insv3 [shape = rect, placement = bottom, address = ".22"];
+  }
+  group cap_app { description = "App Servers"; style = label-only; s1a; s2a; }
+  group cap_db { description = "DB Servers"; style = label-only; insv1; insv2; insv3; }
+}
