@@ -24,7 +24,8 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --clean --target es2020",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check:license": "node ./scripts/check-license-isolation.mjs"
+    "check:license": "node ./scripts/check-license-isolation.mjs",
+    "audit:nwdiag": "node ./scripts/audit-nwdiag-corpus.mjs"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",

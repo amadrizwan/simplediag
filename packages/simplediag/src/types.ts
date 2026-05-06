@@ -130,6 +130,7 @@ export interface DiagramDefaults {
   networkColor?: string;
   textColor?: string;
   lineColor?: string;
+  fontFamily?: string;
   fontSize?: number;
   nodeWidth?: number;
   nodeHeight?: number;

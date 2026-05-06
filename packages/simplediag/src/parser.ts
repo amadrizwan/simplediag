@@ -23,7 +23,7 @@ interface StackEntry {
 export function parse(source: string, options: ParseOptions = {}): ParseResult {
   const diagnostics: Diagnostic[] = [];
   const diagramType = options.diagramType ?? "nwdiag";
-  const lines = source.split(/\r?\n/);
+  const lines = normalizeSource(source).split(/\r?\n/);
   const root: DiagramAst = {
     kind: "Diagram",
     diagramType,
@@ -34,6 +34,7 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
   let offset = 0;
   let rootBlockOpen = false;
   let pendingOpen: { kind: "root" } | { kind: "network" | "group"; node: NetworkAst | GroupAst } | null = null;
+  let sawDiagramKeyword = false;
 
   for (let index = 0; index < lines.length; index += 1) {
     const raw = lines[index] ?? "";
@@ -67,12 +68,19 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
       pendingOpen = null;
     }
 
-    if (/^nwdiag\b/i.test(stripped)) {
-      if (!/^nwdiag\s*\{?\s*;?$/i.test(stripped)) {
-        diagnostics.push(diagnostic("error", "parse.invalidDiagramStart", `Invalid nwdiag start: ${stripped}`, loc));
+    if (/^(nwdiag|diagram)\b/i.test(stripped)) {
+      if (!/^(nwdiag|diagram)\s*\{?\s*;?$/i.test(stripped)) {
+        diagnostics.push(diagnostic("error", "parse.invalidDiagramStart", `Invalid diagram start: ${stripped}`, loc));
       }
+      sawDiagramKeyword = true;
       if (stripped.includes("{")) rootBlockOpen = true;
       else pendingOpen = { kind: "root" };
+      continue;
+    }
+
+    if (!sawDiagramKeyword && !rootBlockOpen && stack.length === 1 && stripped === "{") {
+      sawDiagramKeyword = true;
+      rootBlockOpen = true;
       continue;
     }
 
@@ -139,15 +147,19 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
       continue;
     }
 
-    const peerLink = /^([^\s\[\]{};=]+)\s*--\s*([^\s\[\]{};=]+)(?:\s*\[(.*)\])?\s*;?$/.exec(stripped);
-    if (peerLink) {
-      addStatement(stack, {
-        kind: "PeerLink",
-        from: peerLink[1] ?? "",
-        to: peerLink[2] ?? "",
-        attributes: parseAttributes(peerLink[3] ?? "", diagnostics, loc),
-        loc
-      });
+    const peerChain = /^([^\s\[\]{};=]+(?:\s*--\s*[^\s\[\]{};=]+)+)(?:\s*\[(.*)\])?\s*;?$/.exec(stripped);
+    if (peerChain) {
+      const ids = (peerChain[1] ?? "").split(/\s*--\s*/).filter((s) => s.length > 0);
+      const attrs = parseAttributes(peerChain[2] ?? "", diagnostics, loc);
+      for (let p = 0; p < ids.length - 1; p += 1) {
+        addStatement(stack, {
+          kind: "PeerLink",
+          from: ids[p] ?? "",
+          to: ids[p + 1] ?? "",
+          attributes: attrs,
+          loc
+        });
+      }
       continue;
     }
 
@@ -263,4 +275,87 @@ function rangeAt(line: number, column: number, offset: number, length: number): 
 
 function locationAt(line: number, column: number, offset: number): SourceLocation {
   return { line, column, offset };
+}
+
+function normalizeSource(input: string): string {
+  const out: string[] = [];
+  let buf = "";
+  let inString: '"' | "'" | null = null;
+  let inLineComment = false;
+  let bracketDepth = 0;
+
+  const flush = () => {
+    if (buf.length > 0) {
+      out.push(buf);
+      buf = "";
+    }
+  };
+
+  for (let i = 0; i < input.length; i += 1) {
+    const ch = input[i] ?? "";
+    const next = input[i + 1] ?? "";
+
+    if (inLineComment) {
+      buf += ch;
+      if (ch === "\n") {
+        inLineComment = false;
+        flush();
+      }
+      continue;
+    }
+
+    if (inString) {
+      buf += ch;
+      if (ch === inString && input[i - 1] !== "\\") inString = null;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      inString = ch;
+      buf += ch;
+      continue;
+    }
+
+    if (ch === "#" || (ch === "/" && next === "/")) {
+      inLineComment = true;
+      buf += ch;
+      continue;
+    }
+
+    if (ch === "[") {
+      bracketDepth += 1;
+      buf += ch;
+      continue;
+    }
+    if (ch === "]") {
+      if (bracketDepth > 0) bracketDepth -= 1;
+      buf += ch;
+      continue;
+    }
+
+    if (bracketDepth > 0) {
+      buf += ch;
+      continue;
+    }
+
+    if (ch === "\n") {
+      flush();
+      continue;
+    }
+    if (ch === ";") {
+      buf += ";";
+      flush();
+      continue;
+    }
+    if (ch === "{" || ch === "}") {
+      flush();
+      out.push(ch);
+      continue;
+    }
+
+    buf += ch;
+  }
+
+  flush();
+  return out.join("\n");
 }

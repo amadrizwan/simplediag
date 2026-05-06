@@ -27,3 +27,18 @@ For features that go beyond standard nwdiag (programmatic API, structured
 diagnostics, additional shapes, peer-link attributes, Manhattan routing, the
 networking shape pack), see [SUPERSET.md](./SUPERSET.md). That document also
 holds the placeholder list of planned superset additions.
+
+## nwdiag corpus parity
+
+simplediag is verified against the official nwdiag test corpus
+(`src/nwdiag/tests/diagrams/` + `examples/nwdiag/` from
+[blockdiag/nwdiag](https://github.com/blockdiag/nwdiag)):
+
+```
+pnpm --filter simplediag audit:nwdiag
+```
+
+The script fetches the upstream fixtures (cached under `.audit-cache/`)
+and runs each through parse → resolve → layout → render. Current parity
+on 28 fixtures: **100%** (27 PASS + 1 intentional error correctly
+rejected).

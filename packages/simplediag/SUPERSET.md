@@ -124,7 +124,45 @@ bottommost rail. Each link is assigned a lane so non-overlapping x-ranges
 share a lane and overlapping ones get their own row. nwdiag draws straight
 diagonals between node centers, which clutter quickly with many links.
 
-### 10. Multi-line opening brace
+### 10. Implicit / aliased diagram block
+
+Three forms of the top-level block are accepted:
+
+```nwdiag
+nwdiag { ... }     # canonical
+diagram { ... }    # nwdiag accepts this; we do too
+{ ... }            # bare block — implicit nwdiag
+```
+
+The bare-block form is what nwdiag's own test fixtures use; matching that
+is required for the corpus audit (see `pnpm audit:nwdiag`).
+
+### 11. Multi-statement lines and single-line blocks
+
+Statements separated by `;` on one line (`A; B; C;`) and single-line block
+forms (`network { A; B }`) are normalized at parse time. The line-oriented
+parser sees each statement separately. Real nwdiag's grammar accepts both
+forms; simplediag now matches.
+
+### 12. Peer-link chains
+
+```nwdiag
+A -- B -- C -- D;
+```
+
+Expanded at parse time to three pair-wise peer links (A-B, B-C, C-D).
+Optional attribute brackets at the end apply to every pair.
+
+### 13. Auto-creation of peer-link endpoints
+
+If a peer link references a node that wasn't otherwise declared, the
+resolver creates it (and, if there's an active network, attaches it).
+Real nwdiag does the same to support the "peer network" pattern where
+nodes are introduced only via `--`. simplediag emits a
+`resolve.unattachedNode` warning when this fallback fires inside a
+network so the user knows it happened.
+
+### 14. Multi-line opening brace
 
 ```nwdiag
 nwdiag
@@ -139,7 +177,7 @@ nwdiag
 The opening `{` may sit on its own line (or the next non-empty line). Some
 nwdiag parsers accept this, some don't — simplediag explicitly does.
 
-### 11. Per-node `textcolor`
+### 15. Per-node `textcolor`
 
 ```nwdiag
 web [textcolor = "#1f6feb"];
@@ -149,7 +187,7 @@ Overrides the node label's text colour (and the `numbered` badge text), with
 fallback to `theme.colors.text`. Distinct from `color`, which is the node's
 fill.
 
-### 12. Per-node `numbered`
+### 16. Per-node `numbered`
 
 ```nwdiag
 web1 [numbered = true];   # auto-increment
@@ -161,7 +199,7 @@ Renders a small badge in the top-right corner of the node containing the
 number. `true` opts into a global counter; an integer pins the specific
 number.
 
-### 13. `route` syntax for explicit waypoints
+### 17. `route` syntax for explicit waypoints
 
 ```nwdiag
 route web -> firewall -> db [label = "request path", color = "blue"];
@@ -175,7 +213,7 @@ peer-link lanes so they don't visually mix. Routes accept `label`, `color`,
 `style` like peer-link attributes; default style is `solid` (versus
 `dashed` for peer links) so the difference reads at a glance.
 
-### 14. Build & distribution
+### 18. Build & distribution
 
 - ESM + CJS + `.d.ts` outputs (no Node-only APIs in `src/`)
 - Zero runtime dependencies

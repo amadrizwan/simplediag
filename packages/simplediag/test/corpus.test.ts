@@ -227,13 +227,13 @@ nwdiag {
     }
   },
   {
-    name: "unresolved peer link produces error",
+    name: "unresolved route node produces error",
     source: `
 nwdiag {
   network n {
     a;
   }
-  a -- ghost;
+  route a -> ghost;
 }
 `,
     expectations: {

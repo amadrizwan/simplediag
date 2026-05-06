@@ -25,7 +25,8 @@ function applyDefaults(theme: SimplediagTheme, defaults: DiagramDefaults | undef
     },
     typography: {
       ...theme.typography,
-      ...(defaults.fontSize !== undefined ? { fontSize: defaults.fontSize } : {})
+      ...(defaults.fontSize !== undefined ? { fontSize: defaults.fontSize } : {}),
+      ...(defaults.fontFamily !== undefined ? { fontFamily: defaults.fontFamily } : {})
     }
   };
 }

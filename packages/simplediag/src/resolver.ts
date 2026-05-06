@@ -58,6 +58,7 @@ const defaultDirectives = new Set([
   "default_textcolor",
   "default_linecolor",
   "default_fontsize",
+  "default_fontfamily",
   "node_width",
   "node_height",
   "span_width",
@@ -169,6 +170,8 @@ function visit(statement: AstStatement, state: State, context: Context): void {
       applyProperty(statement.name, statement.value, statement.loc, state, context);
       break;
     case "PeerLink": {
+      ensureNode(statement.from, state, statement.loc);
+      ensureNode(statement.to, state, statement.loc);
       const link: ResolvedPeerLink = {
         id: `peer-${state.peerLinks.length + 1}`,
         from: statement.from,
@@ -353,6 +356,9 @@ function applyDefault(defaults: DiagramDefaults, key: string, value: AttributeVa
     case "default_fontsize":
       if (finiteNum !== undefined && finiteNum > 0) defaults.fontSize = finiteNum;
       break;
+    case "default_fontfamily":
+      defaults.fontFamily = text;
+      break;
     case "node_width":
       if (finiteNum !== undefined && finiteNum > 0) defaults.nodeWidth = finiteNum;
       break;
@@ -523,6 +529,11 @@ function validatePeerLinks(state: State): void {
     }
     if (!state.nodes.has(link.to)) {
       state.diagnostics.push(diagnostic("error", "resolve.unresolvedLink", `Unknown peer link node "${link.to}".`, link.loc));
+    }
+    if (link.from === link.to) {
+      state.diagnostics.push(
+        diagnostic("error", "resolve.selfPeerLink", `Peer link cannot connect node "${link.from}" to itself.`, link.loc)
+      );
     }
   }
 }

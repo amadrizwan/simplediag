@@ -64,7 +64,8 @@ nwdiag {
   it("returns null or error SVG for ordinary diagram errors", () => {
     const nullResult = renderFromSource(`
 nwdiag {
-  missing -- node;
+  network n { a; }
+  route a -> ghost;
 }
 `);
     expect(nullResult.svg).toBeNull();
@@ -72,7 +73,8 @@ nwdiag {
 
     const svgResult = renderFromSource(`
 nwdiag {
-  missing -- node;
+  network n { a; }
+  route a -> ghost;
 }
 `, { errorMode: "svg" });
     expect(svgResult.svg).toContain("simplediag render error");
@@ -112,15 +114,15 @@ nwdiag {
   it("does not duplicate diagnostics across pipeline stages", () => {
     const result = renderFromSource(`
 nwdiag {
-  missing -- node;
+  network n { a; b; }
+  route a -> ghost1 -> ghost2;
 }
 `);
     const errors = result.diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(2);
-    const codes = result.diagnostics.map((d) => d.code);
     const counts = new Map<string, number>();
-    for (const code of codes) counts.set(code, (counts.get(code) ?? 0) + 1);
-    expect(counts.get("resolve.unresolvedLink")).toBe(2);
+    for (const d of result.diagnostics) counts.set(d.code, (counts.get(d.code) ?? 0) + 1);
+    expect(counts.get("resolve.unresolvedRoute")).toBe(2);
   });
 
   it("warns when a node has no network attachment", () => {
@@ -320,11 +322,12 @@ nwdiag {
       renderFromSource(
         `
 nwdiag {
-  missing -- node;
+  network n { a; }
+  route a -> ghost;
 }
 `,
         { errorMode: "throw" }
       )
-    ).toThrow(/Unknown peer link node/);
+    ).toThrow(/Unknown route node/);
   });
 });
