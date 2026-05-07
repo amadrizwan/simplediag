@@ -1,6 +1,6 @@
 {
   "name": "simplediag",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "TypeScript renderer for nwdiag-compatible network diagrams. Browser-native, no Python/Java backend.",
   "keywords": [
     "nwdiag",
