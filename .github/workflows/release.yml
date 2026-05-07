@@ -42,4 +42,5 @@ jobs:
           fi
 
       - name: Publish to npm via Trusted Publishers (OIDC)
-        run: pnpm --filter simplediag publish --no-git-checks --access public --provenance
+        working-directory: packages/simplediag
+        run: npm publish --no-git-checks --access public
