@@ -77,10 +77,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
     } else if (item.trunk) {
       y = railTopY(item.min) + shape.railHeight / 2 - height / 2;
     } else {
-      y =
-        item.max === item.min
-          ? railBottomY(item.min) + labelClearance
-          : (railBottomY(item.min) + railTopY(item.max)) / 2 - height / 2;
+      y = railBottomY(item.min) + labelClearance;
     }
     placedNodes.push({
       id: `node-${item.node.id}`,
@@ -221,8 +218,8 @@ function placeRail(
     });
     const leftmost = points.reduce((acc, p) => (p.x < acc.x ? p : acc), points[0]!);
     const rightmost = points.reduce((acc, p) => (p.x > acc.x ? p : acc), points[0]!);
-    x = leftmost.fromTrunk ? leftmost.x : Math.min(leftmost.x, railStart);
-    right = rightmost.x;
+    x = leftmost.fromTrunk ? leftmost.x : railStart;
+    right = rightmost.fromTrunk ? rightmost.x : maxRight;
   }
   return {
     id: `rail-${network.id}`,
