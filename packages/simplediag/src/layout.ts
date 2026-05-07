@@ -290,22 +290,35 @@ function placeGroups(
   rails: PlacedRail[]
 ): PlacedGroup[] {
   const byId = new Map(nodes.map((node) => [node.nodeId, node]));
+  const labelClearance = defaultTheme.typography.labelFontSize + 6;
   return diagram.groups.flatMap((group) => {
     const members = group.nodeIds.map((id) => byId.get(id)).filter((node): node is InternalPlacedNode => Boolean(node));
     if (members.length === 0) return [];
-    const memberMinY = Math.min(...members.map((node) => node.y));
-    const labelClearance = defaultTheme.typography.labelFontSize + 6;
-    const railsAbove = rails.filter((rail) => rail.y + rail.height <= memberMinY);
-    const x1 = Math.min(...members.map((node) => node.x)) - spacing.groupPadding;
-    const minY = railsAbove.length > 0
-      ? Math.max(...railsAbove.map((rail) => rail.y + rail.height)) + labelClearance
-      : labelClearance;
-    const y1 = Math.max(memberMinY - spacing.groupPadding, minY);
-    const x2 = Math.max(...members.map((node) => node.x + node.width)) + spacing.groupPadding;
-    const y2 = Math.max(...members.map((node) => node.y + node.height)) + spacing.groupPadding;
-    return [
-      {
-        id: `group-${group.id}`,
+    const sorted = [...members].sort((a, b) => a.y - b.y);
+    const clusters: InternalPlacedNode[][] = [];
+    for (const member of sorted) {
+      const last = clusters[clusters.length - 1];
+      if (last) {
+        const lastBottom = Math.max(...last.map((m) => m.y + m.height));
+        const railBetween = rails.some((rail) => rail.y >= lastBottom && rail.y + rail.height <= member.y);
+        if (!railBetween) {
+          last.push(member);
+          continue;
+        }
+      }
+      clusters.push([member]);
+    }
+    return clusters.map((cluster, idx) => {
+      const memberMinY = Math.min(...cluster.map((node) => node.y));
+      const railsAbove = rails.filter((rail) => rail.y + rail.height <= memberMinY);
+      const x1 = Math.min(...cluster.map((node) => node.x)) - spacing.groupPadding;
+      const x2 = Math.max(...cluster.map((node) => node.x + node.width)) + spacing.groupPadding;
+      const y1 = railsAbove.length > 0
+        ? Math.max(memberMinY - spacing.groupPadding, Math.max(...railsAbove.map((rail) => rail.y + rail.height)) + labelClearance)
+        : memberMinY - spacing.groupPadding;
+      const y2 = Math.max(...cluster.map((node) => node.y + node.height)) + spacing.groupPadding;
+      return {
+        id: clusters.length === 1 ? `group-${group.id}` : `group-${group.id}-${idx}`,
         groupId: group.id,
         label: group.description ?? group.name,
         x: x1,
@@ -314,8 +327,8 @@ function placeGroups(
         height: y2 - y1,
         color: group.color,
         style: group.style
-      }
-    ];
+      };
+    });
   });
 }
 

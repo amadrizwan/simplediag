@@ -339,12 +339,12 @@ function applyProperty(
     return;
   }
 
-  if (context.network) {
-    applyNetworkProperty(context.network, key, value);
-    return;
-  }
   if (context.group) {
     applyGroupProperty(context.group, key, value);
+    return;
+  }
+  if (context.network) {
+    applyNetworkProperty(context.network, key, value);
     return;
   }
 

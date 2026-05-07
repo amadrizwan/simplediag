@@ -431,6 +431,88 @@ nwdiag {
     expect(rectCount).toBeLessThan(noLabelRectCount);
   });
 
+  it("splits a group into one rect per cluster when members straddle a rail", () => {
+    const parsed = parse(`
+nwdiag {
+  network n {
+    a [placement = top];
+    b;
+  }
+  group g {
+    description = "G";
+    a;
+    b;
+  }
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const placed = layout(resolved.diagram!);
+    const groupRects = placed.groups.filter((p) => p.groupId === "g");
+    expect(groupRects).toHaveLength(2);
+    const a = placed.nodes.find((n) => n.nodeId === "a")!;
+    const b = placed.nodes.find((n) => n.nodeId === "b")!;
+    const aRect = groupRects.find((g) => g.y < 0 || g.y + g.height <= b.y)!;
+    const bRect = groupRects.find((g) => g.y >= a.y + a.height)!;
+    expect(aRect.y).toBeLessThanOrEqual(a.y);
+    expect(aRect.y + aRect.height).toBeGreaterThanOrEqual(a.y + a.height);
+    expect(bRect.y).toBeLessThanOrEqual(b.y);
+    expect(bRect.y + bRect.height).toBeGreaterThanOrEqual(b.y + b.height);
+    for (const rect of groupRects) expect(rect.label).toBe("G");
+  });
+
+  it("keeps a single group rect when all members share a band", () => {
+    const parsed = parse(`
+nwdiag {
+  network n { a; b; }
+  group g {
+    description = "G";
+    a;
+    b;
+  }
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const placed = layout(resolved.diagram!);
+    const groupRects = placed.groups.filter((p) => p.groupId === "g");
+    expect(groupRects).toHaveLength(1);
+    expect(groupRects[0]?.id).toBe("group-g");
+  });
+
+  it("captures group description and style when group is declared inside a network", () => {
+    const parsed = parse(`
+nwdiag {
+  network n {
+    a; b;
+    group g {
+      description = "Inside";
+      style = label-only;
+      a;
+      b;
+    }
+  }
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const group = resolved.diagram?.groups[0];
+    expect(group?.description).toBe("Inside");
+    expect(group?.style).toBe("label-only");
+    expect(resolved.diagram?.networks[0]?.description).toBeUndefined();
+  });
+
+  it("renders group rects with a dashed stroke", () => {
+    const result = renderFromSource(`
+nwdiag {
+  network n { a; b; }
+  group g {
+    description = "G";
+    a;
+    b;
+  }
+}
+`);
+    expect(result.svg).toMatch(/<rect[^>]*stroke-dasharray="6 4"/);
+  });
+
   it("throws when errorMode is throw", () => {
     expect(() =>
       renderFromSource(

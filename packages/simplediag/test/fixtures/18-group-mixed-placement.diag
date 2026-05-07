@@ -1,0 +1,12 @@
+nwdiag {
+  network n {
+    a [placement = top];
+    b;
+    c;
+  }
+  group g {
+    description = "Mixed-placement group";
+    a;
+    b;
+  }
+}
