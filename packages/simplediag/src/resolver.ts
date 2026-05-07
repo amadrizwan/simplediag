@@ -276,9 +276,12 @@ function visitNode(statement: NodeAst, state: State, context: Context): void {
   if (context.network) {
     const existing = node.attachments.find((attachment) => attachment.networkId === context.network?.id);
     const rawAddress = stringify(statement.attributes.address);
-    const address = rawAddress ? expandAddress(rawAddress, context.network.address) : "";
+    const address = rawAddress ? expandAddressList(rawAddress, context.network.address) : "";
     if (existing) {
-      if (address) existing.address = address;
+      if (address) {
+        existing.address = address;
+        existing.displayAddress = rawAddress;
+      }
       if (!context.group) {
         state.diagnostics.push(
           diagnostic("warning", "resolve.duplicateAttachment", `Node "${node.id}" is already attached to this network.`, statement.loc)
@@ -290,6 +293,7 @@ function visitNode(statement: NodeAst, state: State, context: Context): void {
         nodeId: node.id,
         networkId: context.network.id,
         address,
+        displayAddress: rawAddress || undefined,
         loc: statement.loc
       });
     }
@@ -618,18 +622,27 @@ function validateAddresses(state: State): void {
     for (const attachment of node.attachments) {
       const network = networks.get(attachment.networkId);
       if (!network?.address || !attachment.address) continue;
-      if (!isAddressInCidr(attachment.address, network.address)) {
+      for (const address of splitAddressList(attachment.address)) {
+        if (isAddressInCidr(address, network.address)) continue;
         state.diagnostics.push(
           diagnostic(
             "warning",
             "resolve.addressOutsideNetwork",
-            `Address "${attachment.address}" is outside network "${network.address}".`,
+            `Address "${address}" is outside network "${network.address}".`,
             attachment.loc
           )
         );
       }
     }
   }
+}
+
+function expandAddressList(address: string, networkCidr: string | undefined): string {
+  return splitAddressList(address).map((item) => expandAddress(item, networkCidr)).join(", ");
+}
+
+function splitAddressList(address: string): string[] {
+  return address.split(",").map((item) => item.trim()).filter((item) => item.length > 0);
 }
 
 function expandAddress(address: string, networkCidr: string | undefined): string {

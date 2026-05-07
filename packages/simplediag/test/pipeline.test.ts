@@ -568,6 +568,50 @@ nwdiag {
     }
   });
 
+  it("uses the input shorthand for attachment labels while keeping expanded addresses for validation", () => {
+    const parsed = parse(`
+nwdiag {
+  network Sample_front {
+    address = "192.168.10.0/24";
+    group web {
+      web01 [address = ".1, .2", shape = "node"];
+      web02 [address = ".2, .3"];
+    }
+  }
+  network Sample_back {
+    address = "192.168.20.0/24";
+    web01 [address = ".1"];
+    web02 [address = ".2"];
+    db01 [address = ".101", shape = database];
+    db02 [address = ".102"];
+    group db {
+      db01;
+      db02;
+    }
+  }
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const web01Front = resolved.diagram?.nodes
+      .find((node) => node.id === "web01")
+      ?.attachments.find((attachment) => attachment.networkId === "sample_front");
+
+    expect(web01Front?.address).toBe("192.168.10.1, 192.168.10.2");
+    expect(web01Front?.displayAddress).toBe(".1, .2");
+
+    const placed = layout(resolved.diagram!);
+    const frontLabels = placed.labels
+      .filter((label) => label.kind === "attachment" && label.id.startsWith("label-web01-sample_front"))
+      .map((label) => label.text);
+
+    expect(frontLabels).toEqual([".1", ".2"]);
+
+    const result = render(placed);
+    expect(result.svg).toContain(">.1</text>");
+    expect(result.svg).toContain(">.2</text>");
+    expect(result.svg).not.toContain(">192.168.10.1</text>");
+  });
+
   it("captures group description and style when group is declared inside a network", () => {
     const parsed = parse(`
 nwdiag {
@@ -601,6 +645,56 @@ nwdiag {
 }
 `);
     expect(result.svg).toMatch(/<rect[^>]*stroke-dasharray="6 4"/);
+  });
+
+  it("places same-row trunks between the segments they bridge, not at column 0", () => {
+    const src = `
+nwdiag {
+  network o_and_m_1 {
+    row = "O&M";
+    s1a [shape = rect, placement = top];
+    s2a [shape = rect, placement = top];
+    sw1 [shape = switch];
+  }
+  network o_and_m_2 {
+    row = "O&M";
+    s1b [shape = rect, placement = top];
+    s2b [shape = rect, placement = top];
+    sw1;
+    sw2 [shape = switch];
+  }
+  network o_and_m_3 {
+    row = "O&M";
+    s1c [shape = rect, placement = top];
+    s2c [shape = rect, placement = top];
+    sw2;
+  }
+}
+`;
+    const placed = layout(resolve(parse(src).ast!).diagram!);
+    const colOf = (id: string) => placed.nodes.find((n) => n.nodeId === id)!.column;
+    expect(colOf("sw1")).toBeGreaterThan(colOf("s2a"));
+    expect(colOf("sw1")).toBeLessThan(colOf("s1b"));
+    expect(colOf("sw2")).toBeGreaterThan(colOf("s2b"));
+    expect(colOf("sw2")).toBeLessThan(colOf("s1c"));
+  });
+
+  it("trunks on a non-zero row avoid columns occupied by multi-row drop-lines transiting that row", () => {
+    const src = `
+nwdiag {
+  network o_and_m_1 { row = "O&M"; s1a [shape = rect, placement = top]; s2a [shape = rect, placement = top]; }
+  network internal_1 { row = "Internal"; s1a; s2a; isw1 [shape = switch]; }
+  network internal_2 { row = "Internal"; s1b [shape = rect, placement = top]; s2b [shape = rect, placement = top]; isw1; }
+  network others { row = "Others"; width = full; s1a; s2a; s1b; s2b; }
+}
+`;
+    const placed = layout(resolve(parse(src).ast!).diagram!);
+    const colOf = (id: string) => placed.nodes.find((n) => n.nodeId === id)!.column;
+    // s1a/s2a are placement=top on row 0 with drop-lines transiting row 1 (Internal).
+    // isw1 is a trunk on row 1 — its column must be past s1a/s2a even though their bodies
+    // sit at row 0, because the drop-lines pass through row 1 at the same X.
+    expect(colOf("isw1")).toBeGreaterThan(colOf("s2a"));
+    expect(colOf("isw1")).toBeLessThan(colOf("s1b"));
   });
 
   it("throws when errorMode is throw", () => {

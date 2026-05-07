@@ -197,6 +197,7 @@ export interface ResolvedAttachment {
   nodeId: string;
   networkId: string;
   address?: string;
+  displayAddress?: string;
   loc?: SourceRange;
 }
 

@@ -3,7 +3,6 @@ import type {
   Diagnostic,
   LayoutOptions,
   LayoutResult,
-  NodePlacement,
   PlacedDropLine,
   PlacedGroup,
   PlacedLabel,
@@ -75,7 +74,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
   const clearanceFor = (item: { node: ResolvedNode }) => {
     const N = Math.max(
       0,
-      ...item.node.attachments.map((a) => (a.address ? a.address.split(",").map((s) => s.trim()).filter(Boolean).length : 0))
+      ...item.node.attachments.map((a) => addressLabelLines(a).length)
     );
     if (groupMembership.has(item.node.id)) {
       const addressBand = N > 0 ? 4 + typography.labelFontSize + (N - 1) * lineHeight : 0;
@@ -108,7 +107,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
     if (!bottomNetwork) return 0;
     const att = item.node.attachments.find((a) => a.networkId === bottomNetwork.id);
     if (!att) return 0;
-    const N = att.address ? att.address.split(",").map((s) => s.trim()).filter(Boolean).length : 0;
+    const N = addressLabelLines(att).length;
     if (N === 0) return spacing.labelGap + 4;
     return 4 + N * lineHeight + 4;
   };
@@ -141,21 +140,31 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
 
   const aboveOccupied = new Map<number, Array<[number, number]>>();
 
-  const occupancyRows = (item: typeof nodeIntervals[number], placement: NodePlacement): { rowMin: number; rowMax: number } => {
-    if (placement === "top") return { rowMin: item.min, rowMax: item.min };
-    if (placement === "bottom") return { rowMin: item.max, rowMax: item.max };
+  const occupancyRows = (item: typeof nodeIntervals[number]): { rowMin: number; rowMax: number } => {
     if (item.trunk) return { rowMin: item.min, rowMax: item.min };
-    return { rowMin: item.min, rowMax: item.min };
+    return { rowMin: item.min, rowMax: item.max };
   };
 
   for (const item of nodeIntervals) {
     if (peerOnlyIds.has(item.node.id)) continue;
     const placement = placementFor(item);
     const span = Math.max(1, item.node.width);
-    const map = placement === "top" ? aboveOccupied : occupied;
-    const { rowMin, rowMax } = occupancyRows(item, placement);
-    const column = firstAvailableColumn(map, rowMin, rowMax, span);
-    burnColumns(map, rowMin, rowMax, column, span);
+    const { rowMin, rowMax } = occupancyRows(item);
+    let column: number;
+    if (item.trunk) {
+      let candidate = 0;
+      while (
+        !columnIsFree(aboveOccupied, rowMin, rowMax, candidate, span) ||
+        !columnIsFree(occupied, rowMin, rowMax, candidate, span)
+      ) candidate += 1;
+      column = candidate;
+      burnColumns(aboveOccupied, rowMin, rowMax, column, span);
+      burnColumns(occupied, rowMin, rowMax, column, span);
+    } else {
+      const map = placement === "top" ? aboveOccupied : occupied;
+      column = firstAvailableColumn(map, rowMin, rowMax, span);
+      burnColumns(map, rowMin, rowMax, column, span);
+    }
 
     const x = spacing.margin + labelWidth + spacing.labelGap + column * (shape.nodeWidth + spacing.columnGap);
     const width = shape.nodeWidth * span + spacing.columnGap * (span - 1);
@@ -318,6 +327,20 @@ function nodeInterval(
   return { node, min, max, trunk };
 }
 
+function columnIsFree(
+  occupied: Map<number, Array<[number, number]>>,
+  minRow: number,
+  maxRow: number,
+  column: number,
+  span: number
+): boolean {
+  for (let row = minRow; row <= maxRow; row += 1) {
+    const ranges = occupied.get(row) ?? [];
+    if (ranges.some(([start, end]) => column <= end && column + span - 1 >= start)) return false;
+  }
+  return true;
+}
+
 function firstAvailableColumn(
   occupied: Map<number, Array<[number, number]>>,
   minRow: number,
@@ -325,18 +348,8 @@ function firstAvailableColumn(
   span: number
 ): number {
   let column = 0;
-  while (true) {
-    let available = true;
-    for (let row = minRow; row <= maxRow; row += 1) {
-      const ranges = occupied.get(row) ?? [];
-      if (ranges.some(([start, end]) => column <= end && column + span - 1 >= start)) {
-        available = false;
-        break;
-      }
-    }
-    if (available) return column;
-    column += 1;
-  }
+  while (!columnIsFree(occupied, minRow, maxRow, column, span)) column += 1;
+  return column;
 }
 
 function burnColumns(
@@ -435,10 +448,10 @@ function placeLabels(
     const count = node.attachments.length;
     for (let idx = 0; idx < count; idx += 1) {
       const attachment = node.attachments[idx]!;
-      if (!attachment.address) continue;
+      if (!attachment.address && !attachment.displayAddress) continue;
       const rail = railByNetwork.get(attachment.networkId);
       if (!rail) continue;
-      const lines = attachment.address.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+      const lines = addressLabelLines(attachment);
       if (lines.length === 0) continue;
       const dropX = attachmentX(placed, idx, count);
       const nodeIsAbove = placed.y + placed.height <= rail.y;
@@ -542,11 +555,18 @@ function placeDropLines(
         x: attachmentX(placed, idx, attachments.length),
         y1: railY,
         y2: nodeY,
-        label: attachment.address
+        label: attachment.displayAddress ?? attachment.address
       });
     }
   }
   return out;
+}
+
+function addressLabelLines(attachment: { address?: string; displayAddress?: string }): string[] {
+  return (attachment.displayAddress ?? attachment.address ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }
 
 function attachmentX(node: InternalPlacedNode, index: number, count: number): number {
