@@ -1,6 +1,6 @@
 {
   "name": "simplediag",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "TypeScript renderer for nwdiag-compatible network diagrams. Browser-native, no Python/Java backend.",
   "keywords": [
     "nwdiag",
@@ -15,7 +15,7 @@
   "homepage": "https://github.com/amadrizwan/simplediag#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/amadrizwan/simplediag.git",
+    "url": "https://github.com/amadrizwan/simplediag",
     "directory": "packages/simplediag"
   },
   "bugs": {

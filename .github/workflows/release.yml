@@ -21,9 +21,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
-          cache: pnpm
+          package-manager-cache: false
 
       - run: pnpm install --frozen-lockfile
 
@@ -43,4 +43,7 @@ jobs:
 
       - name: Publish to npm via Trusted Publishers (OIDC)
         working-directory: packages/simplediag
-        run: npm publish --no-git-checks --access public
+        run: |
+          npm install -g npm@latest
+          npm --version
+          npm publish --no-git-checks --access public
