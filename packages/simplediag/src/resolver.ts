@@ -129,26 +129,32 @@ export function resolve(ast: DiagramAst, _options: ResolveOptions = {}): Resolve
     network.rowOrder = rowOrderMap.get(network.rowId)!;
   }
 
+  const peerLinkedIds = new Set<string>();
+  for (const link of state.peerLinks) {
+    peerLinkedIds.add(link.from);
+    peerLinkedIds.add(link.to);
+  }
+
   const defaultNetwork = state.networks[0];
   if (defaultNetwork) {
     for (const node of state.nodes.values()) {
-      if (node.attachments.length === 0) {
-        if (hadDeclaredNetworks) {
-          state.diagnostics.push(
-            diagnostic(
-              "warning",
-              "resolve.unattachedNode",
-              `Node "${node.id}" has no network attachment; attaching to "${defaultNetwork.id}".`,
-              node.loc
-            )
-          );
-        }
-        node.attachments.push({
-          id: `${node.id}@${defaultNetwork.id}`,
-          nodeId: node.id,
-          networkId: defaultNetwork.id
-        });
+      if (node.attachments.length > 0) continue;
+      if (peerLinkedIds.has(node.id)) continue;
+      if (hadDeclaredNetworks) {
+        state.diagnostics.push(
+          diagnostic(
+            "warning",
+            "resolve.unattachedNode",
+            `Node "${node.id}" has no network attachment; attaching to "${defaultNetwork.id}".`,
+            node.loc
+          )
+        );
       }
+      node.attachments.push({
+        id: `${node.id}@${defaultNetwork.id}`,
+        nodeId: node.id,
+        networkId: defaultNetwork.id
+      });
     }
   }
 

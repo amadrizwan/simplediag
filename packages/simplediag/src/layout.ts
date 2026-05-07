@@ -3,6 +3,7 @@ import type {
   Diagnostic,
   LayoutOptions,
   LayoutResult,
+  NodePlacement,
   PlacedDropLine,
   PlacedGroup,
   PlacedLabel,
@@ -56,23 +57,115 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
   const nodeIntervals = diagram.nodes.map((node) => nodeInterval(node, networkById));
   const occupied = new Map<number, Array<[number, number]>>();
   const placedNodes: InternalPlacedNode[] = [];
+  const peerOnlyIds = new Set<string>(
+    diagram.nodes.filter((node) => node.attachments.length === 0).map((node) => node.id)
+  );
+  const chainLinkIds = new Set<string>();
 
   const railTopY = (order: number) => spacing.margin + order * spacing.railGap;
   const railBottomY = (order: number) => railTopY(order) + shape.railHeight;
+  const lineHeight = typography.labelFontSize + 2;
+  const baseClearance = spacing.labelGap + lineHeight + 4;
+
+  const groupMembership = new Set<string>();
+  for (const group of diagram.groups) {
+    for (const id of group.nodeIds) groupMembership.add(id);
+  }
+
+  const clearanceFor = (item: { node: ResolvedNode }) => {
+    const N = Math.max(
+      0,
+      ...item.node.attachments.map((a) => (a.address ? a.address.split(",").map((s) => s.trim()).filter(Boolean).length : 0))
+    );
+    if (groupMembership.has(item.node.id)) {
+      const addressBand = N > 0 ? 4 + typography.labelFontSize + (N - 1) * lineHeight : 0;
+      return addressBand + (4 + typography.labelFontSize + 4) + spacing.groupPadding;
+    }
+    return spacing.labelGap + Math.max(1, N) * lineHeight + 4;
+  };
+  const placementOverrides = new Map<string, "top" | "bottom">();
+  const intervalById = new Map(nodeIntervals.map((item) => [item.node.id, item]));
+  for (const link of diagram.peerLinks) {
+    const fromItem = intervalById.get(link.from);
+    const toItem = intervalById.get(link.to);
+    if (!fromItem || !toItem) continue;
+    const considerAnchor = (anchor: typeof fromItem, peer: typeof toItem) => {
+      if (!peerOnlyIds.has(peer.node.id)) return;
+      if (peerOnlyIds.has(anchor.node.id)) return;
+      if (anchor.node.placement !== "between") return;
+      if (anchor.min === 0) placementOverrides.set(anchor.node.id, "top");
+    };
+    considerAnchor(fromItem, toItem);
+    considerAnchor(toItem, fromItem);
+  }
+  const placementFor = (item: { node: ResolvedNode }) => placementOverrides.get(item.node.id) ?? item.node.placement;
+
+  const bottomClearanceFor = (item: { node: ResolvedNode; min: number; max: number; trunk: boolean }) => {
+    if (item.trunk) return 0;
+    if (placementFor(item) !== "between") return 0;
+    if (item.max === item.min) return 0;
+    const bottomNetwork = diagram.networks.find((n) => n.rowOrder === item.max);
+    if (!bottomNetwork) return 0;
+    const att = item.node.attachments.find((a) => a.networkId === bottomNetwork.id);
+    if (!att) return 0;
+    const N = att.address ? att.address.split(",").map((s) => s.trim()).filter(Boolean).length : 0;
+    if (N === 0) return spacing.labelGap + 4;
+    return 4 + N * lineHeight + 4;
+  };
+
+  let effectiveRailGap = spacing.railGap;
+  for (const item of nodeIntervals) {
+    if (peerOnlyIds.has(item.node.id) || item.trunk) continue;
+    if (placementFor(item) !== "between") continue;
+    if (item.max === item.min) continue;
+    const top = clearanceFor(item);
+    const bottom = bottomClearanceFor(item);
+    const required = top + shape.nodeHeight + bottom + shape.railHeight + 4;
+    if (required > effectiveRailGap) effectiveRailGap = required;
+  }
+  spacing.railGap = effectiveRailGap;
+
+  const anchorKey = (item: { node: ResolvedNode; min: number; max: number; trunk: boolean }) => {
+    if (item.trunk) return null;
+    const placement = placementFor(item);
+    if (placement === "top") return `top:${item.min}`;
+    if (placement === "bottom") return `bottom:${item.max}`;
+    return `between:${item.min}`;
+  };
+  const clearanceByAnchor = new Map<string, number>();
+  for (const item of nodeIntervals) {
+    const key = anchorKey(item);
+    if (key === null) continue;
+    clearanceByAnchor.set(key, Math.max(clearanceByAnchor.get(key) ?? baseClearance, clearanceFor(item)));
+  }
+
+  const aboveOccupied = new Map<number, Array<[number, number]>>();
+
+  const occupancyRows = (item: typeof nodeIntervals[number], placement: NodePlacement): { rowMin: number; rowMax: number } => {
+    if (placement === "top") return { rowMin: item.min, rowMax: item.min };
+    if (placement === "bottom") return { rowMin: item.max, rowMax: item.max };
+    if (item.trunk) return { rowMin: item.min, rowMax: item.min };
+    return { rowMin: item.min, rowMax: item.min };
+  };
 
   for (const item of nodeIntervals) {
+    if (peerOnlyIds.has(item.node.id)) continue;
+    const placement = placementFor(item);
     const span = Math.max(1, item.node.width);
-    const column = firstAvailableColumn(occupied, item.min, item.max, span);
-    burnColumns(occupied, item.min, item.max, column, span);
+    const map = placement === "top" ? aboveOccupied : occupied;
+    const { rowMin, rowMax } = occupancyRows(item, placement);
+    const column = firstAvailableColumn(map, rowMin, rowMax, span);
+    burnColumns(map, rowMin, rowMax, column, span);
 
     const x = spacing.margin + labelWidth + spacing.labelGap + column * (shape.nodeWidth + spacing.columnGap);
     const width = shape.nodeWidth * span + spacing.columnGap * (span - 1);
     const height = shape.nodeHeight;
-    const labelClearance = spacing.labelGap + typography.labelFontSize + 4;
+    const key = anchorKey(item);
+    const labelClearance = key === null ? baseClearance : clearanceByAnchor.get(key) ?? baseClearance;
     let y: number;
-    if (item.node.placement === "top") {
+    if (placement === "top") {
       y = railTopY(item.min) - labelClearance - height;
-    } else if (item.node.placement === "bottom") {
+    } else if (placement === "bottom") {
       y = railBottomY(item.max) + labelClearance;
     } else if (item.trunk) {
       y = railTopY(item.min) + shape.railHeight / 2 - height / 2;
@@ -94,7 +187,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
       color: item.node.color,
       textColor: item.node.textColor,
       numbered: item.node.numbered,
-      placement: item.node.placement,
+      placement,
       stacked: item.node.stacked,
       centerX: x + width / 2,
       centerY: y + height / 2,
@@ -103,6 +196,77 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
       attachedNetworkIds: new Set(item.node.attachments.map((a) => a.networkId)),
       trunk: item.trunk
     });
+  }
+
+  if (peerOnlyIds.size > 0) {
+    const placedById = new Map(placedNodes.map((n) => [n.nodeId, n]));
+    const peerNeighbors = new Map<string, Array<{ otherId: string; linkId: string }>>();
+    for (const link of diagram.peerLinks) {
+      if (!peerNeighbors.has(link.from)) peerNeighbors.set(link.from, []);
+      if (!peerNeighbors.has(link.to)) peerNeighbors.set(link.to, []);
+      peerNeighbors.get(link.from)!.push({ otherId: link.to, linkId: link.id });
+      peerNeighbors.get(link.to)!.push({ otherId: link.from, linkId: link.id });
+    }
+    const chainGap = baseClearance;
+    const visited = new Set<string>();
+    const queue: Array<{ nodeId: string; anchor: InternalPlacedNode; goesAbove: boolean }> = [];
+    for (const placed of placedNodes) {
+      const goesAbove = placed.minNetworkOrder === 0;
+      const neighbors = peerNeighbors.get(placed.nodeId) ?? [];
+      for (const { otherId, linkId } of neighbors) {
+        if (peerOnlyIds.has(otherId) && !visited.has(otherId)) {
+          visited.add(otherId);
+          queue.push({ nodeId: otherId, anchor: placed, goesAbove });
+          chainLinkIds.add(linkId);
+        }
+      }
+    }
+    const nodeById = new Map(diagram.nodes.map((n) => [n.id, n]));
+    while (queue.length > 0) {
+      const { nodeId, anchor, goesAbove } = queue.shift()!;
+      const node = nodeById.get(nodeId);
+      if (!node) continue;
+      const x = anchor.x;
+      const width = anchor.width;
+      const height = shape.nodeHeight;
+      const y = goesAbove
+        ? anchor.y - chainGap - height
+        : anchor.y + anchor.height + chainGap;
+      const placed: InternalPlacedNode = {
+        id: `node-${nodeId}`,
+        nodeId,
+        label: node.label,
+        x,
+        y,
+        width,
+        height,
+        column: anchor.column,
+        row: anchor.row,
+        span: 1,
+        shape: node.shape,
+        color: node.color,
+        textColor: node.textColor,
+        numbered: node.numbered,
+        placement: node.placement,
+        stacked: node.stacked,
+        centerX: x + width / 2,
+        centerY: y + height / 2,
+        minNetworkOrder: anchor.minNetworkOrder,
+        maxNetworkOrder: anchor.maxNetworkOrder,
+        attachedNetworkIds: new Set(),
+        trunk: false
+      };
+      placedNodes.push(placed);
+      placedById.set(nodeId, placed);
+      const neighbors = peerNeighbors.get(nodeId) ?? [];
+      for (const { otherId, linkId } of neighbors) {
+        if (peerOnlyIds.has(otherId) && !visited.has(otherId)) {
+          visited.add(otherId);
+          queue.push({ nodeId: otherId, anchor: placed, goesAbove });
+          chainLinkIds.add(linkId);
+        }
+      }
+    }
   }
 
   const maxRight = Math.max(
@@ -121,7 +285,7 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
   const groups = placeGroups(diagram, placedNodes, spacing, rails);
   const dropLines = placeDropLines(diagram, placedNodes, rails);
   const junctions = placeJunctions(diagram, placedNodes, rails);
-  const peerLinks = placePeerLinks(diagram, placedNodes, rails, spacing);
+  const peerLinks = placePeerLinks(diagram, placedNodes, rails, spacing, chainLinkIds);
   const routes = placeRoutes(diagram, placedNodes, rails, spacing, peerLinks);
   const bounds = computeBounds(rails, placedNodes, groups, labels, peerLinks, routes, spacing.margin);
 
@@ -264,20 +428,32 @@ function placeLabels(
   }
   const nodeById = new Map(nodes.map((node) => [node.nodeId, node]));
   const railByNetwork = new Map(rails.map((rail) => [rail.networkId, rail]));
+  const lineHeight = typography.labelFontSize + 2;
   for (const node of diagram.nodes) {
     const placed = nodeById.get(node.id);
     if (!placed) continue;
-    for (const attachment of node.attachments) {
+    const count = node.attachments.length;
+    for (let idx = 0; idx < count; idx += 1) {
+      const attachment = node.attachments[idx]!;
       if (!attachment.address) continue;
       const rail = railByNetwork.get(attachment.networkId);
       if (!rail) continue;
-      labels.push({
-        id: `label-${node.id}-${attachment.networkId}`,
-        text: attachment.address,
-        x: placed.centerX + spacing.labelGap,
-        y: rail.y - spacing.labelGap,
-        kind: "attachment"
-      });
+      const lines = attachment.address.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+      if (lines.length === 0) continue;
+      const dropX = attachmentX(placed, idx, count);
+      const nodeIsAbove = placed.y + placed.height <= rail.y;
+      for (let line = 0; line < lines.length; line += 1) {
+        const y = nodeIsAbove
+          ? rail.y - 4 - (lines.length - 1 - line) * lineHeight
+          : rail.y + rail.height + 4 + typography.labelFontSize + line * lineHeight;
+        labels.push({
+          id: `label-${node.id}-${attachment.networkId}-${line}`,
+          text: lines[line]!,
+          x: dropX + 3,
+          y,
+          kind: "attachment"
+        });
+      }
     }
   }
   return labels;
@@ -310,13 +486,17 @@ function placeGroups(
     }
     return clusters.map((cluster, idx) => {
       const memberMinY = Math.min(...cluster.map((node) => node.y));
+      const memberMaxBottom = Math.max(...cluster.map((node) => node.y + node.height));
       const railsAbove = rails.filter((rail) => rail.y + rail.height <= memberMinY);
+      const railsBelow = rails.filter((rail) => rail.y >= memberMaxBottom);
       const x1 = Math.min(...cluster.map((node) => node.x)) - spacing.groupPadding;
       const x2 = Math.max(...cluster.map((node) => node.x + node.width)) + spacing.groupPadding;
       const y1 = railsAbove.length > 0
         ? Math.max(memberMinY - spacing.groupPadding, Math.max(...railsAbove.map((rail) => rail.y + rail.height)) + labelClearance)
         : memberMinY - spacing.groupPadding;
-      const y2 = Math.max(...cluster.map((node) => node.y + node.height)) + spacing.groupPadding;
+      const desiredY2 = memberMaxBottom + spacing.groupPadding;
+      const maxY2 = railsBelow.length > 0 ? Math.min(...railsBelow.map((r) => r.y)) - 6 : Infinity;
+      const y2 = Math.max(memberMaxBottom + 4, Math.min(desiredY2, maxY2));
       return {
         id: clusters.length === 1 ? `group-${group.id}` : `group-${group.id}-${idx}`,
         groupId: group.id,
@@ -409,7 +589,8 @@ function placePeerLinks(
   diagram: ResolvedDiagram,
   nodes: InternalPlacedNode[],
   rails: PlacedRail[],
-  spacing: typeof defaultTheme.spacing
+  spacing: typeof defaultTheme.spacing,
+  chainLinkIds: Set<string>
 ): PlacedPeerLink[] {
   const nodeById = new Map(nodes.map((node) => [node.nodeId, node]));
   const bottomRailY = rails.length > 0 ? Math.max(...rails.map((r) => r.y + r.height)) : 0;
@@ -426,6 +607,7 @@ function placePeerLinks(
     style?: PlacedPeerLink["style"];
     minX: number;
     maxX: number;
+    chain: boolean;
   }
 
   const pending: PendingLink[] = [];
@@ -441,12 +623,13 @@ function placePeerLinks(
       color: link.color,
       style: link.style,
       minX: Math.min(from.centerX, to.centerX),
-      maxX: Math.max(from.centerX, to.centerX)
+      maxX: Math.max(from.centerX, to.centerX),
+      chain: chainLinkIds.has(link.id)
     });
   }
 
   const lanes: Array<Array<PendingLink>> = [];
-  const ordered = [...pending].sort((a, b) => a.minX - b.minX || a.maxX - b.maxX);
+  const ordered = [...pending].filter((p) => !p.chain).sort((a, b) => a.minX - b.minX || a.maxX - b.maxX);
   for (const link of ordered) {
     const laneIndex = lanes.findIndex((lane) => lane.every((other) => other.maxX < link.minX || other.minX > link.maxX));
     if (laneIndex === -1) {
@@ -465,6 +648,22 @@ function placePeerLinks(
   }
 
   return pending.map((link) => {
+    if (link.chain) {
+      const upper = link.from.y < link.to.y ? link.from : link.to;
+      const lower = upper === link.from ? link.to : link.from;
+      return {
+        id: link.id,
+        fromNodeId: link.from.nodeId,
+        toNodeId: link.to.nodeId,
+        points: [
+          { x: upper.centerX, y: upper.y + upper.height },
+          { x: lower.centerX, y: lower.y }
+        ],
+        label: link.label,
+        color: link.color,
+        style: link.style
+      };
+    }
     const laneIndex = laneByLink.get(link.id) ?? 0;
     const laneY = baseLaneY + laneIndex * laneStep;
     const fromBottom = link.from.y + link.from.height;

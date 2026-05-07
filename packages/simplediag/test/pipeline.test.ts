@@ -478,6 +478,96 @@ nwdiag {
     expect(groupRects[0]?.id).toBe("group-g");
   });
 
+  it("places peer-only nodes as a vertical chain below their anchor without auto-attaching to the default network", () => {
+    const parsed = parse(`
+nwdiag {
+  network LAN1 {
+    a [address = "a1"];
+  }
+  network LAN2 {
+    a [address = "a2"];
+    switch;
+  }
+  switch -- equip;
+  equip -- printer;
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    expect(resolved.diagnostics.filter((d) => d.code === "resolve.unattachedNode")).toEqual([]);
+    const equipNode = resolved.diagram?.nodes.find((n) => n.id === "equip");
+    const printerNode = resolved.diagram?.nodes.find((n) => n.id === "printer");
+    expect(equipNode?.attachments).toEqual([]);
+    expect(printerNode?.attachments).toEqual([]);
+
+    const placed = layout(resolved.diagram!);
+    const sw = placed.nodes.find((n) => n.nodeId === "switch")!;
+    const equip = placed.nodes.find((n) => n.nodeId === "equip")!;
+    const printer = placed.nodes.find((n) => n.nodeId === "printer")!;
+    expect(equip.x).toBe(sw.x);
+    expect(printer.x).toBe(sw.x);
+    expect(equip.y).toBeGreaterThan(sw.y + sw.height);
+    expect(printer.y).toBeGreaterThan(equip.y + equip.height);
+
+    const swToEquip = placed.peerLinks.find((l) => (l.fromNodeId === "switch" && l.toNodeId === "equip") || (l.fromNodeId === "equip" && l.toNodeId === "switch"))!;
+    expect(swToEquip.points).toHaveLength(2);
+    expect(swToEquip.points[0]!.x).toBe(swToEquip.points[1]!.x);
+  });
+
+  it("keeps row siblings horizontally aligned when one node needs extra address-stack clearance", () => {
+    const parsed = parse(`
+nwdiag {
+  network dmz {
+    address = "210.0.0.0/24";
+    web01 [address = "210.0.0.1, 210.0.0.20"];
+    web02 [address = "210.0.0.2"];
+    web03;
+  }
+  network internal {
+    address = "172.16.0.0/24";
+    web01 [address = "172.16.0.1"];
+    web02 [address = "172.16.0.2"];
+    web03;
+    db01;
+  }
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const placed = layout(resolved.diagram!);
+    const ys = ["web01", "web02", "web03"].map((id) => placed.nodes.find((n) => n.nodeId === id)!.y);
+    expect(ys[0]).toBe(ys[1]);
+    expect(ys[1]).toBe(ys[2]);
+    const db = placed.nodes.find((n) => n.nodeId === "db01")!;
+    expect(db.y).toBeGreaterThan(ys[0]!);
+  });
+
+  it("splits comma-separated attachment addresses into stacked labels on the drop line", () => {
+    const parsed = parse(`
+nwdiag {
+  network dmz {
+    address = "210.0.0.0/24";
+    web01 [address = "210.0.0.1, 210.0.0.20"];
+  }
+  network internal {
+    address = "172.16.0.0/24";
+    web01 [address = "172.16.0.1"];
+  }
+}
+`);
+    const resolved = resolve(parsed.ast!);
+    const placed = layout(resolved.diagram!);
+
+    const dmzLabels = placed.labels.filter((l) => l.kind === "attachment" && l.id.startsWith("label-web01-dmz"));
+    expect(dmzLabels.map((l) => l.text)).toEqual(["210.0.0.1", "210.0.0.20"]);
+    expect(dmzLabels[0]!.y).toBeLessThan(dmzLabels[1]!.y);
+
+    const dmzRail = placed.rails.find((r) => r.networkId === "dmz")!;
+    const web01 = placed.nodes.find((n) => n.nodeId === "web01")!;
+    for (const label of dmzLabels) {
+      expect(label.y).toBeGreaterThan(dmzRail.y + dmzRail.height);
+      expect(label.y).toBeLessThan(web01.y + web01.height);
+    }
+  });
+
   it("captures group description and style when group is declared inside a network", () => {
     const parsed = parse(`
 nwdiag {
