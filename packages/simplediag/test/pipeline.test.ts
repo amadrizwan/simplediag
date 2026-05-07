@@ -559,12 +559,15 @@ nwdiag {
     const dmzLabels = placed.labels.filter((l) => l.kind === "attachment" && l.id.startsWith("label-web01-dmz"));
     expect(dmzLabels.map((l) => l.text)).toEqual(["210.0.0.1", "210.0.0.20"]);
     expect(dmzLabels[0]!.y).toBeLessThan(dmzLabels[1]!.y);
+    expect(dmzLabels.map((l) => l.anchor)).toEqual(["middle", "middle"]);
 
     const dmzRail = placed.rails.find((r) => r.networkId === "dmz")!;
     const web01 = placed.nodes.find((n) => n.nodeId === "web01")!;
+    const dmzDrop = placed.dropLines.find((line) => line.nodeId === "web01" && line.networkId === "dmz")!;
     for (const label of dmzLabels) {
       expect(label.y).toBeGreaterThan(dmzRail.y + dmzRail.height);
       expect(label.y).toBeLessThan(web01.y + web01.height);
+      expect(label.x).toBe(dmzDrop.x);
     }
   });
 
@@ -605,10 +608,18 @@ nwdiag {
       .map((label) => label.text);
 
     expect(frontLabels).toEqual([".1", ".2"]);
+    const frontPlacedLabels = placed.labels
+      .filter((label) => label.kind === "attachment" && label.id.startsWith("label-web01-sample_front"));
+    const frontDrop = placed.dropLines.find((line) => line.nodeId === "web01" && line.networkId === "sample_front")!;
+    expect(frontPlacedLabels.map((label) => label.anchor)).toEqual(["start", "start"]);
+    for (const label of frontPlacedLabels) {
+      expect(label.x).toBeGreaterThan(frontDrop.x);
+    }
 
     const result = render(placed);
     expect(result.svg).toContain(">.1</text>");
     expect(result.svg).toContain(">.2</text>");
+    expect(result.svg).not.toContain('text-anchor="middle">.1</text>');
     expect(result.svg).not.toContain(">192.168.10.1</text>");
   });
 
@@ -679,6 +690,89 @@ nwdiag {
     expect(colOf("sw2")).toBeLessThan(colOf("s1c"));
   });
 
+  it("keeps grouped nodes side by side when placement top shares a band with default placement", () => {
+    const src = `
+nwdiag {
+  group {
+    color = "#FFaaaa";
+    web01;
+    db01;
+  }
+  group {
+    color = "#aaaaFF";
+    web02;
+    db02;
+  }
+  network dmz {
+    address = "210.0.0.0/24";
+    web01 [address = "210.0.0.1"];
+    web02 [address = "210.0.0.2"];
+  }
+  network internal {
+    address = "172.0.0.0/24";
+    web01 [address = "172.0.0.1"];
+    web02 [address = "172.0.0.2"];
+    db01 [placement = top];
+    db02;
+  }
+}
+`;
+    const placed = layout(resolve(parse(src).ast!).diagram!);
+    const web01 = placed.nodes.find((n) => n.nodeId === "web01")!;
+    const db01 = placed.nodes.find((n) => n.nodeId === "db01")!;
+    const group = placed.groups.find((g) => g.groupId === "group-1")!;
+
+    expect(rectsOverlap(web01, db01)).toBe(false);
+    expect(db01.x).toBeGreaterThan(web01.x + web01.width);
+    expect(web01.y).toBeLessThan(db01.y + db01.height);
+    expect(db01.y).toBeLessThan(web01.y + web01.height);
+    expect(group.x).toBeLessThanOrEqual(web01.x);
+    expect(group.x).toBeLessThanOrEqual(db01.x);
+    expect(group.x + group.width).toBeGreaterThanOrEqual(db01.x + db01.width);
+  });
+
+  it("keeps grouped nodes side by side when placement bottom shares a band with default placement", () => {
+    const src = `
+nwdiag {
+  group {
+    color = "#FFaaaa";
+    web01;
+    db01;
+  }
+  group {
+    color = "#aaaaFF";
+    web02;
+    db02;
+  }
+  network dmz {
+    address = "210.0.0.0/24";
+    web01 [address = "210.0.0.1"];
+    web02 [address = "210.0.0.2"];
+  }
+  network internal {
+    address = "172.0.0.0/24";
+    web01 [address = "172.0.0.1"];
+    web02 [address = "172.0.0.2"];
+    db01 [placement = bottom];
+    db02;
+  }
+}
+`;
+    const placed = layout(resolve(parse(src).ast!).diagram!);
+    const web01 = placed.nodes.find((n) => n.nodeId === "web01")!;
+    const db01 = placed.nodes.find((n) => n.nodeId === "db01")!;
+    const groupRects = placed.groups.filter((g) => g.groupId === "group-1");
+
+    expect(rectsOverlap(web01, db01)).toBe(false);
+    expect(db01.x).toBeGreaterThan(web01.x + web01.width);
+    expect(db01.y).toBeGreaterThan(web01.y);
+    expect(groupRects.some((group) => {
+      const coversWeb = group.x <= web01.x && group.x + group.width >= web01.x + web01.width;
+      const coversDb = group.x <= db01.x && group.x + group.width >= db01.x + db01.width;
+      return coversWeb || coversDb;
+    })).toBe(true);
+  });
+
   it("trunks on a non-zero row avoid columns occupied by multi-row drop-lines transiting that row", () => {
     const src = `
 nwdiag {
@@ -697,6 +791,53 @@ nwdiag {
     expect(colOf("isw1")).toBeLessThan(colOf("s1b"));
   });
 
+  it("placement=bottom multi-homed nodes land in the column range of their non-fullWidth segment", () => {
+    const src = `
+nwdiag {
+  network o_and_m_1 {
+    row = "O&M";
+    s1a [shape = rect, placement = top];
+    s2a [shape = rect, placement = top];
+    insv1 [shape = rect, placement = bottom];
+    sw1 [shape = switch];
+  }
+  network o_and_m_2 {
+    row = "O&M";
+    s1b [shape = rect, placement = top];
+    s2b [shape = rect, placement = top];
+    sw1;
+    insv2 [shape = rect, placement = bottom];
+    sw2 [shape = switch];
+  }
+  network o_and_m_3 {
+    row = "O&M";
+    s1c [shape = rect, placement = top];
+    s2c [shape = rect, placement = top];
+    sw2;
+    insv3 [shape = rect, placement = bottom];
+  }
+  network storage {
+    row = "Storage";
+    width = full;
+    insv1 [shape = rect, placement = bottom];
+    insv2 [shape = rect, placement = bottom];
+    insv3 [shape = rect, placement = bottom];
+  }
+}
+`;
+    const placed = layout(resolve(parse(src).ast!).diagram!);
+    const colOf = (id: string) => placed.nodes.find((n) => n.nodeId === id)!.column;
+    // insv1 attached to o_and_m_1 (s1a..sw1) — must be in [s1a.col, sw1.col]
+    expect(colOf("insv1")).toBeGreaterThanOrEqual(colOf("s1a"));
+    expect(colOf("insv1")).toBeLessThanOrEqual(colOf("sw1"));
+    // insv2 attached to o_and_m_2 (sw1..sw2) — must land within s1b..s2b
+    expect(colOf("insv2")).toBeGreaterThanOrEqual(colOf("s1b"));
+    expect(colOf("insv2")).toBeLessThanOrEqual(colOf("s2b"));
+    // insv3 attached to o_and_m_3 (sw2..s2c) — must land within s1c..s2c
+    expect(colOf("insv3")).toBeGreaterThanOrEqual(colOf("s1c"));
+    expect(colOf("insv3")).toBeLessThanOrEqual(colOf("s2c"));
+  });
+
   it("throws when errorMode is throw", () => {
     expect(() =>
       renderFromSource(
@@ -711,3 +852,10 @@ nwdiag {
     ).toThrow(/Unknown route node/);
   });
 });
+
+function rectsOverlap(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number }
+): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}

@@ -325,6 +325,7 @@ export interface PlacedLabel {
   text: string;
   x: number;
   y: number;
+  anchor?: "start" | "middle" | "end";
   kind: "network" | "attachment" | "group";
 }
 

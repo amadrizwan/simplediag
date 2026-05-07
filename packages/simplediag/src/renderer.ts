@@ -133,8 +133,9 @@ export function render(layoutResult: LayoutResult, options: RenderOptions = {}):
   }
 
   for (const label of layoutResult.labels) {
+    const anchor = label.anchor && label.anchor !== "start" ? ` text-anchor="${label.anchor}"` : "";
     parts.push(
-      `<text x="${round(label.x)}" y="${round(label.y)}" font-size="${theme.typography.labelFontSize}" fill="${escapeXml(label.kind === "attachment" ? theme.colors.mutedText : theme.colors.text)}">${escapeXml(label.text)}</text>`
+      `<text x="${round(label.x)}" y="${round(label.y)}"${anchor} font-size="${theme.typography.labelFontSize}" fill="${escapeXml(label.kind === "attachment" ? theme.colors.mutedText : theme.colors.text)}">${escapeXml(label.text)}</text>`
     );
   }
 

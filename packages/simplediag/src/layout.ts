@@ -139,31 +139,147 @@ export function layout(diagram: ResolvedDiagram, options: LayoutOptions = {}): L
   }
 
   const aboveOccupied = new Map<number, Array<[number, number]>>();
+  const segmentColumnRanges = new Map<string, { min: number; max: number }>();
 
-  const occupancyRows = (item: typeof nodeIntervals[number]): { rowMin: number; rowMax: number } => {
+  const occupancyRows = (
+    item: typeof nodeIntervals[number],
+    _placement: ReturnType<typeof placementFor>
+  ): { rowMin: number; rowMax: number } => {
     if (item.trunk) return { rowMin: item.min, rowMax: item.min };
     return { rowMin: item.min, rowMax: item.max };
+  };
+
+  const columnConstraint = (item: typeof nodeIntervals[number]): { min: number; max: number } | null => {
+    let lo = -Infinity;
+    let hi = Infinity;
+    let any = false;
+    for (const att of item.node.attachments) {
+      const network = networkById.get(att.networkId);
+      if (!network || network.fullWidth) continue;
+      const range = segmentColumnRanges.get(att.networkId);
+      if (!range) continue;
+      lo = Math.max(lo, range.min);
+      hi = Math.min(hi, range.max);
+      any = true;
+    }
+    if (!any || lo > hi) return null;
+    return { min: lo, max: hi };
+  };
+
+  const firstAvailableInRange = (
+    map: Map<number, Array<[number, number]>>,
+    rowMin: number,
+    rowMax: number,
+    span: number,
+    range: { min: number; max: number }
+  ): number | null => {
+    for (let col = range.min; col + span - 1 <= range.max; col += 1) {
+      if (columnIsFree(map, rowMin, rowMax, col, span)) return col;
+    }
+    return null;
   };
 
   for (const item of nodeIntervals) {
     if (peerOnlyIds.has(item.node.id)) continue;
     const placement = placementFor(item);
     const span = Math.max(1, item.node.width);
-    const { rowMin, rowMax } = occupancyRows(item);
+    const { rowMin, rowMax } = occupancyRows(item, placement);
+    const constraint = columnConstraint(item);
     let column: number;
     if (item.trunk) {
-      let candidate = 0;
-      while (
-        !columnIsFree(aboveOccupied, rowMin, rowMax, candidate, span) ||
-        !columnIsFree(occupied, rowMin, rowMax, candidate, span)
-      ) candidate += 1;
-      column = candidate;
+      const candidateInRange = constraint
+        ? (() => {
+            for (let col = constraint.min; col + span - 1 <= constraint.max; col += 1) {
+              if (
+                columnIsFree(aboveOccupied, rowMin, rowMax, col, span) &&
+                columnIsFree(occupied, rowMin, rowMax, col, span)
+              ) return col;
+            }
+            return null;
+          })()
+        : null;
+      if (candidateInRange !== null) {
+        column = candidateInRange;
+      } else {
+        let candidate = 0;
+        while (
+          !columnIsFree(aboveOccupied, rowMin, rowMax, candidate, span) ||
+          !columnIsFree(occupied, rowMin, rowMax, candidate, span)
+        ) candidate += 1;
+        column = candidate;
+      }
       burnColumns(aboveOccupied, rowMin, rowMax, column, span);
       burnColumns(occupied, rowMin, rowMax, column, span);
+    } else if (placement === "top" && item.min > 0) {
+      const aboveRowMin = item.min;
+      const aboveRowMax = item.max;
+      const bandRowMin = item.min - 1;
+      const bandRowMax = item.max;
+      const candidateInRange = constraint
+        ? (() => {
+            for (let col = constraint.min; col + span - 1 <= constraint.max; col += 1) {
+              if (
+                columnIsFree(aboveOccupied, aboveRowMin, aboveRowMax, col, span) &&
+                columnIsFree(occupied, bandRowMin, bandRowMax, col, span)
+              ) return col;
+            }
+            return null;
+          })()
+        : null;
+      if (candidateInRange !== null) {
+        column = candidateInRange;
+      } else {
+        let candidate = 0;
+        while (
+          !columnIsFree(aboveOccupied, aboveRowMin, aboveRowMax, candidate, span) ||
+          !columnIsFree(occupied, bandRowMin, bandRowMax, candidate, span)
+        ) candidate += 1;
+        column = candidate;
+      }
+      burnColumns(aboveOccupied, aboveRowMin, aboveRowMax, column, span);
+      burnColumns(occupied, bandRowMin, bandRowMax, column, span);
+    } else if (placement === "bottom") {
+      const bandRowMin = item.min;
+      const bandRowMax = item.max + 1;
+      const bodyRowMin = item.max;
+      const bodyRowMax = item.max;
+      const candidateInRange = constraint
+        ? (() => {
+            for (let col = constraint.min; col + span - 1 <= constraint.max; col += 1) {
+              if (
+                columnIsFree(occupied, bandRowMin, bandRowMax, col, span) &&
+                columnIsFree(aboveOccupied, bodyRowMin, bodyRowMax, col, span)
+              ) return col;
+            }
+            return null;
+          })()
+        : null;
+      if (candidateInRange !== null) {
+        column = candidateInRange;
+      } else {
+        let candidate = 0;
+        while (
+          !columnIsFree(occupied, bandRowMin, bandRowMax, candidate, span) ||
+          !columnIsFree(aboveOccupied, bodyRowMin, bodyRowMax, candidate, span)
+        ) candidate += 1;
+        column = candidate;
+      }
+      burnColumns(occupied, bandRowMin, bandRowMax, column, span);
+      burnColumns(aboveOccupied, bodyRowMin, bodyRowMax, column, span);
     } else {
-      const map = placement === "top" ? aboveOccupied : occupied;
-      column = firstAvailableColumn(map, rowMin, rowMax, span);
+      const map = placement === "top" && item.min === 0 ? aboveOccupied : occupied;
+      const inRange = constraint ? firstAvailableInRange(map, rowMin, rowMax, span, constraint) : null;
+      column = inRange ?? firstAvailableColumn(map, rowMin, rowMax, span);
       burnColumns(map, rowMin, rowMax, column, span);
+    }
+    for (const att of item.node.attachments) {
+      const range = segmentColumnRanges.get(att.networkId);
+      if (!range) {
+        segmentColumnRanges.set(att.networkId, { min: column, max: column });
+      } else {
+        range.min = Math.min(range.min, column);
+        range.max = Math.max(range.max, column);
+      }
     }
 
     const x = spacing.margin + labelWidth + spacing.labelGap + column * (shape.nodeWidth + spacing.columnGap);
@@ -456,14 +572,17 @@ function placeLabels(
       const dropX = attachmentX(placed, idx, count);
       const nodeIsAbove = placed.y + placed.height <= rail.y;
       for (let line = 0; line < lines.length; line += 1) {
+        const text = lines[line]!;
+        const centered = isFullIpv4Address(text);
         const y = nodeIsAbove
           ? rail.y - 4 - (lines.length - 1 - line) * lineHeight
           : rail.y + rail.height + 4 + typography.labelFontSize + line * lineHeight;
         labels.push({
           id: `label-${node.id}-${attachment.networkId}-${line}`,
-          text: lines[line]!,
-          x: dropX + 3,
+          text,
+          x: centered ? dropX : dropX + 3,
           y,
+          anchor: centered ? "middle" : "start",
           kind: "attachment"
         });
       }
@@ -567,6 +686,12 @@ function addressLabelLines(attachment: { address?: string; displayAddress?: stri
     .split(",")
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+function isFullIpv4Address(value: string): boolean {
+  const parts = value.split(".");
+  if (parts.length !== 4) return false;
+  return parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) >= 0 && Number(part) <= 255);
 }
 
 function attachmentX(node: InternalPlacedNode, index: number, count: number): number {
