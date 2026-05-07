@@ -1,6 +1,6 @@
 # Repository Guidance
 
-- `plantuml/` is reference-only material. Do not copy Java source, GPL headers, author banners, or implementation text into `packages/simplediag/`.
+- Do not copy third-party source, GPL headers, author banners, or implementation text into `packages/simplediag/`.
 - New package code lives in `packages/simplediag/`.
 - Keep the implementation layered: parser -> resolver -> layout -> renderer.
 - Layout code must not touch DOM APIs or produce SVG strings.

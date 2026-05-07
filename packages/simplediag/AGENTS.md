@@ -1,6 +1,6 @@
 # Simplediag Package Guidance
 
-- This package is an MIT reimplementation. PlantUML is a behavioral reference only.
+- This package is an MIT TypeScript implementation.
 - Preserve the layer boundaries:
   - `parser` turns source text into AST plus diagnostics.
   - `resolver` turns AST into semantic model plus diagnostics.

@@ -34,12 +34,11 @@ pnpm install
 pnpm test          # runs simplediag's vitest suite
 pnpm build         # ESM + CJS + DTS via tsup
 pnpm typecheck
-pnpm check:license # verifies plantuml/ reference material isn't reachable from src/
+pnpm check:license # verifies source and license isolation rules
 ```
 
-The `plantuml/` directory is GPLv3 reference material and is gitignored
-+ excluded from the published npm artifact. See [AGENTS.md](./AGENTS.md)
-for the license isolation rules.
+See [AGENTS.md](./AGENTS.md) for repository guidance and license isolation
+rules.
 
 ## License
 

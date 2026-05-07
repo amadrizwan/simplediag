@@ -32,8 +32,8 @@ if (result.svg) {
 ```
 
 It targets the common-case nwdiag input — multiple networks, multi-homed
-nodes, groups, peer links, addresses, shapes, defaults. It is not a PlantUML
-port; the rendering is reimplemented in TypeScript under MIT.
+nodes, groups, peer links, addresses, shapes, defaults. The rendering is
+implemented in TypeScript under MIT.
 
 For features that go beyond standard nwdiag (programmatic API, structured
 diagnostics, additional shapes, peer-link attributes, Manhattan routing, the

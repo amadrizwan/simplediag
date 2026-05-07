@@ -11,3 +11,4 @@ coverage/
 *.log
 .DS_Store
 .audit-cache/
+.agents/skills/agent-browser/
