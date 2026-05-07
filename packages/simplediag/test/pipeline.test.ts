@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRenderer, layout, parse, render, renderFromSource, resolve } from "../src";
+import { createRenderer, defaultTheme, layout, parse, render, renderFromSource, resolve } from "../src";
 
 const source = `
 nwdiag {
@@ -32,6 +32,13 @@ describe("pipeline", () => {
     const placed = layout(resolved.diagram!);
     expect(placed.rails).toHaveLength(1);
     expect(placed.rails[0]).toMatchObject({ label: "dmz", fullWidth: true });
+    const networkLabels = placed.labels.filter((label) => label.kind === "network");
+    expect(networkLabels.map((label) => label.text)).toEqual(["dmz", "10.0.0.0/24"]);
+    expect(networkLabels[0]?.x).toBe(networkLabels[1]?.x);
+    expect(networkLabels[0]?.x).toBe(placed.rails[0]!.x - defaultTheme.spacing.labelGap);
+    expect(networkLabels.map((label) => label.anchor)).toEqual(["end", "end"]);
+    expect(networkLabels[0]!.y).toBeLessThan(networkLabels[1]!.y);
+    expect(networkLabels[1]!.y - networkLabels[0]!.y).toBe(defaultTheme.typography.labelFontSize + 2);
     expect(placed.nodes.find((node) => node.nodeId === "db01")).toMatchObject({ span: 2, shape: "database" });
     expect(placed.groups[0]).toMatchObject({ label: "Application" });
     expect(placed.peerLinks[0]?.points).toHaveLength(4);
@@ -644,18 +651,22 @@ nwdiag {
     expect(resolved.diagram?.networks[0]?.description).toBeUndefined();
   });
 
-  it("renders group rects with a dashed stroke", () => {
+  it("renders group rects with translucent fill and no outer stroke", () => {
     const result = renderFromSource(`
 nwdiag {
   network n { a; b; }
   group g {
     description = "G";
+    color = "#abc123";
     a;
     b;
   }
 }
 `);
-    expect(result.svg).toMatch(/<rect[^>]*stroke-dasharray="6 4"/);
+    const groupRect = result.svg?.match(/<rect[^>]*fill="#abc123"[^>]*>/)?.[0];
+    expect(groupRect).toContain('fill-opacity="0.55"');
+    expect(groupRect).not.toContain("stroke=");
+    expect(groupRect).not.toContain("stroke-dasharray");
   });
 
   it("places same-row trunks between the segments they bridge, not at column 0", () => {
@@ -731,7 +742,7 @@ nwdiag {
     expect(group.x + group.width).toBeGreaterThanOrEqual(db01.x + db01.width);
   });
 
-  it("keeps grouped nodes side by side when placement bottom shares a band with default placement", () => {
+  it("keeps grouped nodes non-overlapping when placement bottom shares a band with default placement", () => {
     const src = `
 nwdiag {
   group {
@@ -764,13 +775,114 @@ nwdiag {
     const groupRects = placed.groups.filter((g) => g.groupId === "group-1");
 
     expect(rectsOverlap(web01, db01)).toBe(false);
-    expect(db01.x).toBeGreaterThan(web01.x + web01.width);
     expect(db01.y).toBeGreaterThan(web01.y);
     expect(groupRects.some((group) => {
       const coversWeb = group.x <= web01.x && group.x + group.width >= web01.x + web01.width;
       const coversDb = group.x <= db01.x && group.x + group.width >= db01.x + db01.width;
       return coversWeb || coversDb;
     })).toBe(true);
+  });
+
+  it("prefers the same column for grouped nodes in non-overlapping rows", () => {
+    const src = `
+nwdiag {
+  network dmz {
+    blocker;
+    web;
+  }
+  network internal {
+    db;
+  }
+  group app {
+    web;
+    db;
+  }
+}
+`;
+    const placed = layout(resolve(parse(src).ast!).diagram!);
+    const blocker = placed.nodes.find((n) => n.nodeId === "blocker")!;
+    const web = placed.nodes.find((n) => n.nodeId === "web")!;
+    const db = placed.nodes.find((n) => n.nodeId === "db")!;
+
+    expect(blocker.column).toBe(0);
+    expect(web.column).toBe(1);
+    expect(db.column).toBe(web.column);
+    expect(rectsOverlap(web, db)).toBe(false);
+  });
+
+  it("aligns web and db nodes from the same color group in vertical bands", () => {
+    const src = `
+nwdiag {
+  group {
+    color = "#FFaaaa";
+    web01;
+    db01;
+  }
+  group {
+    color = "#aaFFaa";
+    web02;
+    db02;
+  }
+  group {
+    color = "#aaaaFF";
+    web03;
+    db03;
+  }
+
+  network dmz {
+    web01;
+    web02;
+    web03;
+  }
+  network internal {
+    web01;
+    db01;
+    web02;
+    db02;
+    web03;
+    db03;
+  }
+}
+`;
+    const placed = layout(resolve(parse(src).ast!).diagram!);
+    for (const [webId, dbId] of [["web01", "db01"], ["web02", "db02"], ["web03", "db03"]] as const) {
+      const web = placed.nodes.find((n) => n.nodeId === webId)!;
+      const db = placed.nodes.find((n) => n.nodeId === dbId)!;
+      expect(db.column).toBe(web.column);
+      expect(db.x).toBe(web.x);
+      expect(db.y).toBeGreaterThan(web.y + web.height);
+      expect(rectsOverlap(web, db)).toBe(false);
+    }
+    for (const groupId of ["group-1", "group-2", "group-3"]) {
+      expect(placed.groups.filter((group) => group.groupId === groupId)).toHaveLength(1);
+    }
+  });
+
+  it("prefers the same column for grouped top/default nodes in different bands", () => {
+    const src = `
+nwdiag {
+  network dmz {
+    blocker [placement = top];
+    web [placement = top];
+  }
+  network internal {
+    db;
+  }
+  group app {
+    web;
+    db;
+  }
+}
+`;
+    const placed = layout(resolve(parse(src).ast!).diagram!);
+    const blocker = placed.nodes.find((n) => n.nodeId === "blocker")!;
+    const web = placed.nodes.find((n) => n.nodeId === "web")!;
+    const db = placed.nodes.find((n) => n.nodeId === "db")!;
+
+    expect(blocker.column).toBe(0);
+    expect(web.column).toBe(1);
+    expect(db.column).toBe(web.column);
+    expect(rectsOverlap(web, db)).toBe(false);
   });
 
   it("trunks on a non-zero row avoid columns occupied by multi-row drop-lines transiting that row", () => {

@@ -56,7 +56,7 @@ export function render(layoutResult: LayoutResult, options: RenderOptions = {}):
   for (const group of layoutResult.groups) {
     if (group.style !== "label-only") {
       parts.push(
-        `<rect x="${round(group.x)}" y="${round(group.y)}" width="${round(group.width)}" height="${round(group.height)}" rx="${theme.shapes.cornerRadius}" fill="${escapeXml(group.color ?? theme.colors.groupFill)}" stroke="${escapeXml(theme.colors.groupStroke)}" stroke-width="${theme.strokes.groupWidth}" stroke-dasharray="6 4"/>`
+        `<rect x="${round(group.x)}" y="${round(group.y)}" width="${round(group.width)}" height="${round(group.height)}" rx="${theme.shapes.cornerRadius}" fill="${escapeXml(group.color ?? theme.colors.groupFill)}" fill-opacity="0.55"/>`
       );
     }
     if (group.label) {

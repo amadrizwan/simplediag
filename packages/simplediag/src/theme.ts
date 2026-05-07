@@ -10,7 +10,7 @@ export const defaultTheme: SimplediagTheme = {
     railStroke: "#6f93aa",
     nodeFill: "#ffffff",
     nodeStroke: "#374957",
-    groupFill: "#f3f7fa",
+    groupFill: "#e0e9ff",
     groupStroke: "#9aa9b5",
     linkStroke: "#374957",
     errorFill: "#fff1f0",
